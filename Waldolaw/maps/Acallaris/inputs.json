@@ -1,0 +1,53 @@
+{
+  "mapsize": 7,
+  "fuel": 20000,
+  "speed": 1,
+  "max_speed": 6,
+  "max_fuel": 30000,
+  "items": [
+    {
+      "name": "WALDO_0c79",
+      "distances": [
+        {
+          "Distance": 5,
+          "SatelliteName": "SAT_2"
+        },
+        {
+          "Distance": 9,
+          "SatelliteName": "SAT_3"
+        },
+        {
+          "Distance": 3,
+          "SatelliteName": "SAT_0"
+        },
+        {
+          "Distance": 7,
+          "SatelliteName": "SAT_1"
+        }
+      ],
+      "fuel": -1
+    },
+    {
+      "name": "PLANET_f4e2",
+      "distances": [
+        {
+          "Distance": 4,
+          "SatelliteName": "SAT_2"
+        },
+        {
+          "Distance": 6,
+          "SatelliteName": "SAT_3"
+        },
+        {
+          "Distance": 8,
+          "SatelliteName": "SAT_1"
+        },
+        {
+          "Distance": 6,
+          "SatelliteName": "SAT_0"
+        }
+      ],
+      "fuel": 5000
+    }
+  ]
+}

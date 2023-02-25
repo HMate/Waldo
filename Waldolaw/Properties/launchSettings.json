@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "Waldolaw": {
+      "commandName": "Project",
+      "commandLineArgs": "maps\\Acallaris\\inputs.json maps\\Acallaris\\outputs.json",
+      "workingDirectory": "E:\\crey\\waldo-championship-main\\Waldolaw\\Waldolaw"
+    }
+  }
+}

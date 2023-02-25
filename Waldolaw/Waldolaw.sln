@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.4.33403.182
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Waldolaw", "Waldolaw.csproj", "{BA09170F-3944-4305-AAA7-7689C787AE16}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Waldest", "..\Waldest\Waldest.csproj", "{6C96D6A9-E51D-4FC0-8353-87EB4C06AE8B}"
+	ProjectSection(ProjectDependencies) = postProject
+		{BA09170F-3944-4305-AAA7-7689C787AE16} = {BA09170F-3944-4305-AAA7-7689C787AE16}
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{BA09170F-3944-4305-AAA7-7689C787AE16}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BA09170F-3944-4305-AAA7-7689C787AE16}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BA09170F-3944-4305-AAA7-7689C787AE16}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BA09170F-3944-4305-AAA7-7689C787AE16}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6C96D6A9-E51D-4FC0-8353-87EB4C06AE8B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6C96D6A9-E51D-4FC0-8353-87EB4C06AE8B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6C96D6A9-E51D-4FC0-8353-87EB4C06AE8B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6C96D6A9-E51D-4FC0-8353-87EB4C06AE8B}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {28EAD8ED-C7C6-43C6-BB67-06B5B3E25E4C}
+	EndGlobalSection
+EndGlobal
