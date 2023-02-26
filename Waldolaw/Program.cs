@@ -2,7 +2,9 @@
 using System.Collections.Generic;
 using System.IO;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json;
+using NLog;
 using NLog.Config;
 using NLog.Extensions.Logging;
 
@@ -17,17 +19,22 @@ namespace Waldolaw
             var outputPath = args[1];
             try
             {
-                ILogger<Program> logger = LoggerFactory.Create(builder => builder.AddNLog()).CreateLogger<Program>();
-                logger.LogInformation("Waldolaw started");
+                Logger logger = LogManager.GetCurrentClassLogger();
+                logger.Info("Waldolaw started");
 
                 Serializer serializer = new Serializer(inputsPath, outputPath);
-                var data = serializer.LoadInputs();
-                if (data == null)
+                UserInputsJSON? input = serializer.LoadInputs();
+                if (input == null)
                 {
                     Console.WriteLine("User inputs is null. Exiting.");
                     return;
                 }
-
+                GameBuilder builder = new();
+                Game game = builder.Build(input);
+                foreach (var item in game.Items)
+                {
+                    logger.Info($"{item}");
+                }
 
                 // TODO: calculate commands
                 //outputsJson?.Commands.Add("FORWARD 1");

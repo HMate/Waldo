@@ -47,9 +47,9 @@ namespace Waldolaw
         public Item Base { get; private set; }
         public Item Ship { get; private set; }
 
-        public Game(Level level, List<Item> items)
+        public Game(int mapSize, List<Item> items)
         {
-            Level = level;
+            Level = new Level(mapSize);
             Items = items;
 
             foreach (Item item in Items)
@@ -66,6 +66,7 @@ namespace Waldolaw
                         Ship = item;
                         break;
                 }
+                Level.PlaceItem(item.Position, item);
             }
 
             Guard.IsNotNull(Waldo, $"items should contain a {nameof(Waldo)} entry");

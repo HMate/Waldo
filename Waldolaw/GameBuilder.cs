@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.Diagnostics;
 using Microsoft.Extensions.Logging;
+using NLog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,7 +12,7 @@ namespace Waldolaw
 {
     public class GameBuilder
     {
-        public GameBuilder(ILogger<GameBuilder> logger) { _logger = logger; }
+        public GameBuilder() { }
 
         public Game Build(UserInputsJSON input)
         {
@@ -34,7 +35,7 @@ namespace Waldolaw
             items.Add(new Item("BASE", ItemType.Base, new Pos((input.mapsize - 1) / 2, input.mapsize - 1), 0));
             items.Add(new Item("SHIP", ItemType.Ship, new Pos((input.mapsize - 1) / 2, input.mapsize - 1), input.fuel));
 
-            return new Game(new Level(input.mapsize), items);
+            return new Game(input.mapsize, items);
         }
 
         private int GetSatelliteDistance(string name, List<DistancesJSON> distances)
@@ -77,12 +78,12 @@ namespace Waldolaw
             };
             if (type == ItemType.Empty)
             {
-                _logger.LogWarning("Could not parse type from '{name}'", name);
+                _logger.Warn("Could not parse type from '{name}'", name);
             }
             return type;
         }
 
-        private readonly ILogger _logger;
+        private readonly Logger _logger = LogManager.GetCurrentClassLogger();
         private readonly string Satellite0 = "SAT_0";
         private readonly string Satellite1 = "SAT_1";
         private readonly string Satellite2 = "SAT_2";
