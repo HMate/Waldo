@@ -1,3 +1,5 @@
+using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 using Waldolaw;
 using Xunit;
 
@@ -26,11 +28,21 @@ namespace Waldest
                         } ),
                 }
             );
-            GameBuilder builder = new();
+            // NLog unittest logging examples:
+            // https://github.com/NLog/NLog/blob/43eca983676d87f1d9d9f28872304236393827ba/tests/NLog.UnitTests/Config/TargetConfigurationTests.cs
+            GameBuilder builder = new(NullLogger<GameBuilder>.Instance);
             Game game = builder.Build(input);
 
-            Assert.Equal(7, game.Level.Size);
-            Assert.Equal(8, game.Items.Count);
+            game.Level.Size.Should().Be(7);
+            game.Items.Count.Should().Be(8);
+
+            game.Waldo.Type.Should().Be(ItemType.Waldo);
+            game.Base.Type.Should().Be(ItemType.Base);
+            game.Ship.Type.Should().Be(ItemType.Ship);
+
+            game.Waldo.Position.Should().Be(new Pos(1, 2));
+            game.Base.Position.Should().Be(new Pos(3, 6));
+            game.Ship.Position.Should().Be(new Pos(3, 6));
         }
     }
 }

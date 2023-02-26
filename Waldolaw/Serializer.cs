@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Waldolaw
 {
-    public record DistancesJSON(float Distance, string SatelliteName);
+    public record DistancesJSON(int Distance, string SatelliteName);
     public record ItemJSON(string name, List<DistancesJSON> distances, int fuel);
     public record UserInputsJSON(
         int mapsize,
