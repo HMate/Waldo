@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.Design;
+using System.Data.SqlTypes;
 using System.IO;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -17,16 +19,24 @@ namespace Waldolaw
         {
             var inputsPath = args[0];
             var outputPath = args[1];
+
+            string layout = "${longdate}|${level:uppercase=true}|${logger}| ${message:withException=true}";
+            Logger logger = NLog.LogManager.Setup().LoadConfiguration(builder =>
+            {
+                builder.ForLogger().WriteToConsole(layout);
+                builder.ForLogger().WriteToDebugConditional(layout);
+                builder.ForLogger().WriteToFile(fileName: "waldolaw.log", layout);
+            }).GetCurrentClassLogger();
+
             try
             {
-                Logger logger = LogManager.GetCurrentClassLogger();
                 logger.Info("Waldolaw started");
 
                 Serializer serializer = new Serializer(inputsPath, outputPath);
                 UserInputsJSON? input = serializer.LoadInputs();
                 if (input == null)
                 {
-                    Console.WriteLine("User inputs is null. Exiting.");
+                    logger.Warn("User inputs is null. Exiting.");
                     return;
                 }
                 GameBuilder builder = new();
@@ -36,13 +46,14 @@ namespace Waldolaw
                     logger.Info($"{item}");
                 }
 
-                // TODO: calculate commands
-                //outputsJson?.Commands.Add("FORWARD 1");
+                Commands commands = new AI().calculatePathToWaldo(game);
+
+                serializer.SaveOutputs(commands.ToCommandList());
 
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message);
+                logger.Error(ex);
             }
         }
     }

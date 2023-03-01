@@ -42,7 +42,7 @@ namespace Waldest
                 }
             );
 
-            GameBuilder builder = new(NullLogger<GameBuilder>.Instance);
+            GameBuilder builder = new();
             Game game = builder.Build(input);
 
             game.Level.Size.Should().Be(7);

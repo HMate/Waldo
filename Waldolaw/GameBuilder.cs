@@ -19,7 +19,6 @@ namespace Waldolaw
             List<Item> items = new List<Item>();
             foreach (var item in input.items)
             {
-                // max.y - s1.y
                 int sat0 = GetSatelliteDistance(Satellite0, item.distances);
                 int sat2 = GetSatelliteDistance(Satellite2, item.distances);
 

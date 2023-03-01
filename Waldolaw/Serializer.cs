@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using NLog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,7 +18,11 @@ namespace Waldolaw
         int max_fuel,
         List<ItemJSON> items
     );
-    public record UserOutputJSON(List<string> Commands);
+
+    public record UserOutputJSON
+    {
+        public List<string> Commands { get; set; } = new();
+    }
 
     public class Serializer
     {
@@ -32,13 +37,19 @@ namespace Waldolaw
 
         public UserInputsJSON? LoadInputs()
         {
-            return JsonConvert.DeserializeObject<UserInputsJSON>(File.ReadAllText(InputFile));
+            string text = File.ReadAllText(InputFile);
+            return JsonConvert.DeserializeObject<UserInputsJSON>(text);
         }
 
-        public void SaveOutputs()
+        public void SaveOutputs(List<string> commands)
         {
-            var outputsJson = JsonConvert.DeserializeObject<UserOutputJSON>(File.ReadAllText(OutputFile));
+            var outputsJson = new UserOutputJSON()
+            {
+                Commands = commands
+            };
             File.WriteAllText(OutputFile, JsonConvert.SerializeObject(outputsJson));
         }
+
+        private readonly Logger _logger = LogManager.GetCurrentClassLogger();
     }
 }
