@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using System.Runtime.Versioning;
 using System.Text;
 using System.Threading.Tasks;
@@ -8,7 +9,57 @@ using CommunityToolkit.Diagnostics;
 
 namespace Waldolaw
 {
-    public record struct Pos(int X, int Y);
+    public enum Direction
+    {
+        Top,
+        Right,
+        Bottom,
+        Left,
+        None,
+    }
+
+    public static class DirectionExtensions
+    {
+        public static int CostTo(this Direction current, Direction target)
+        {
+            if (current == target) return 0;
+            else if (current == Direction.None || target == Direction.None) return 1;
+            else if ((current == Direction.Top || target == Direction.Top) &&
+                (current == Direction.Left || target == Direction.Left))
+            {
+                return 1;
+            }
+            else
+            {
+                return Math.Abs(target - current);
+            }
+        }
+
+        public static Direction GetDirectionToTurn(this Direction current, Direction target)
+        {
+            if (current == Direction.None || target == Direction.None) { return Direction.None; }
+            int turnCost = target - current;
+            if (turnCost == 0) { return Direction.None; }
+            if ((turnCost == 1) || (turnCost == 4))
+            {
+                return Direction.Right;
+            }
+            return Direction.Left;
+        }
+    }
+
+    public record struct Pos(int X, int Y)
+    {
+        public static Pos operator +(Pos self, Pos other)
+        {
+            return new Pos(self.X + other.X, self.Y + other.Y);
+        }
+
+        public static Pos operator -(Pos self, Pos other)
+        {
+            return new Pos(self.X - other.X, self.Y - other.Y);
+        }
+    }
 
     public enum ItemType
     {
@@ -28,6 +79,7 @@ namespace Waldolaw
         public ItemType Type { get; set; }
         public Pos Position { get; set; }
         public int Fuel { get; set; }
+        public Direction Direction { get; set; } = Direction.Top;
 
         public Item(string name, ItemType type, Pos position, int fuel = 0)
         {

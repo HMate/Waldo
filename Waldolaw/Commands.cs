@@ -1,4 +1,5 @@
-﻿using System.Reflection.Metadata.Ecma335;
+﻿using NLog;
+using System.Reflection.Metadata.Ecma335;
 
 namespace Waldolaw
 {
@@ -10,29 +11,36 @@ namespace Waldolaw
         Dock,
         Name
     }
-    public enum TurnDirection
-    {
-        Left = 0,
-        Right,
-    }
 
     public class Commands
     {
         public void AddForward(int steps)
         {
-            commands.Add(new Command(CommandType.Forward, steps));
+            var command = new Command(CommandType.Forward, steps);
+            commands.Add(command);
+            _logger.Info($"New Command: {command.ToCommandString()}");
         }
-        public void AddTurn(TurnDirection direction)
+        public void AddTurn(Direction direction)
         {
-            commands.Add(new Command(CommandType.Turn, direction == TurnDirection.Left ? "LEFT" : "RIGHT"));
+            if (direction != Direction.Left && direction != Direction.Right)
+            {
+                _logger.Warn($"Got invalid direction for turn: {direction}");
+            }
+            Command command = new Command(CommandType.Turn, direction == Direction.Left ? "LEFT" : "RIGHT");
+            commands.Add(command);
+            _logger.Info($"New Command: {command.ToCommandString()}");
         }
         public void AddDock(int durationMs)
         {
-            commands.Add(new Command(CommandType.Dock, durationMs));
+            Command command = new Command(CommandType.Dock, durationMs);
+            commands.Add(command);
+            _logger.Info($"New Command: {command.ToCommandString()}");
         }
         public void AddName(string name)
         {
-            commands.Add(new Command(CommandType.Name, name));
+            Command command = new Command(CommandType.Name, name);
+            commands.Add(command);
+            _logger.Info($"New Command: {command.ToCommandString()}");
         }
 
         public List<string> ToCommandList()
@@ -79,5 +87,7 @@ namespace Waldolaw
         }
 
         private List<Command> commands = new();
+
+        private readonly Logger _logger = LogManager.GetCurrentClassLogger();
     }
 }

@@ -46,7 +46,7 @@ namespace Waldolaw
                     logger.Info($"{item}");
                 }
 
-                Commands commands = new AI().calculatePathToWaldo(game);
+                Commands commands = new AI(game).CalculatePathToWaldo();
 
                 serializer.SaveOutputs(commands.ToCommandList());
 

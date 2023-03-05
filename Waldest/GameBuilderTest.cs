@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Waldest
 {
-    public class WaldolawTest
+    public class GameBuilderTest
     {
         [Fact]
         public void level_builder_loads_items()
