@@ -1,4 +1,5 @@
-﻿using NLog;
+﻿using CommunityToolkit.Diagnostics;
+using NLog;
 using System.Reflection.Metadata.Ecma335;
 
 namespace Waldolaw
@@ -32,6 +33,7 @@ namespace Waldolaw
         }
         public void AddDock(int durationMs)
         {
+            Guard.IsGreaterThanOrEqualTo(durationMs, 500);
             Command command = new Command(CommandType.Dock, durationMs);
             commands.Add(command);
             _logger.Info($"New Command: {command.ToCommandString()}");

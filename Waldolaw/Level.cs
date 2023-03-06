@@ -57,9 +57,9 @@ namespace Waldolaw
             return result;
         }
 
-        public void PrintLevel()
+        public void PrintLevel(Item ship)
         {
-            _logger.Debug("---- LEVEL: ----");
+            _logger.Debug($"---- LEVEL: -- SHIP FUEL: {ship.Fuel} --");
             foreach (var row in _grid)
             {
                 StringBuilder message = new StringBuilder();
@@ -71,8 +71,8 @@ namespace Waldolaw
                     }
                     else
                     {
-                        Item? ship = cell.Items.Find(it => it.Type == ItemType.Ship);
-                        if (ship != null)
+                        Item? cellShip = cell.Items.Find(it => it.Type == ItemType.Ship);
+                        if (cellShip != null)
                         {
                             switch (ship.Direction)
                             {

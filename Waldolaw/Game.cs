@@ -23,7 +23,7 @@ namespace Waldolaw
         public static int CostTo(this Direction current, Direction target)
         {
             if (current == target) return 0;
-            else if (current == Direction.None || target == Direction.None) return 1;
+            else if (current == Direction.None || target == Direction.None) return 0;
             else if ((current == Direction.Top || target == Direction.Top) &&
                 (current == Direction.Left || target == Direction.Left))
             {
@@ -80,6 +80,7 @@ namespace Waldolaw
         public Pos Position { get; set; }
         public int Fuel { get; set; }
         public Direction Direction { get; set; } = Direction.Top;
+        public int Speed { get; internal set; } = 1;
 
         public Item(string name, ItemType type, Pos position, int fuel = 0)
         {

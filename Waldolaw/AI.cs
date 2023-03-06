@@ -36,29 +36,49 @@ namespace Waldolaw
             Level level = _game.Level;
             Item ship = _game.Ship;
             PrecalcManhattanDistances(_game.Waldo.Position);
-            level.PrintLevel();
+            level.PrintLevel(ship);
             level.PrintManhattanDistances();
+            _estimatedStepsToFinish = level.GetGridCell(_game.Base.Position).manhattanDistance * 2;
+
             while (ship.Position != _game.Waldo.Position)
             {
-                CalcNextStep(result, level, ship);
-                level.PrintLevel();
+                DoNextStep(result, level, ship);
+                level.PrintLevel(ship);
             }
 
             level.ClearGridDistances();
             PrecalcManhattanDistances(_game.Base.Position);
-            level.PrintLevel();
+            level.PrintLevel(ship);
             level.PrintManhattanDistances();
+            _estimatedStepsToFinish = level.GetGridCell(_game.Base.Position).manhattanDistance;
+
             while (ship.Position != _game.Base.Position)
             {
-                CalcNextStep(result, level, ship);
-                level.PrintLevel();
+                DoNextStep(result, level, ship);
+                level.PrintLevel(ship);
             }
 
             return result;
         }
 
-        private static void CalcNextStep(Commands result, Level level, Item ship)
+        private void DoNextStep(Commands result, Level level, Item ship)
         {
+            var posItems = level.GetGridCell(ship.Position).Items;
+            if (posItems.Count > 1 && posItems[0].Type == ItemType.Planet && !_didDock)
+            {
+                // TODO: We have to foresee how many planets are on our way.
+                // If this is the last, we should tank up as man fuel as possible. If that is enough to finish the level, OK.
+                // If that is not enough, we have to compute path to next planet. - case if that is before/after waldo.
+                // Have to compute how much fuel we need until finish. For that we want to have full route to waldo and back.
+                // Separate DecideGoal+CalcNextStep action and DoNextStep actions.
+                // TODO: IF planet has less fuel, calculate that. 
+                var dockDuration = Math.Max(500, CalcFuelCost(_estimatedStepsToFinish, ship.Speed));
+                result.AddDock(dockDuration);
+                ship.Fuel += dockDuration;
+                _didDock = true;
+                return;
+            }
+
             List<(Pos, Direction)> nbs = level.GetNeighbours(ship.Position);
             (int cost, Pos pos, Direction dir) target = (1000000, ship.Position, ship.Direction);
             foreach ((Pos nb, Direction dir) in nbs)
@@ -75,23 +95,29 @@ namespace Waldolaw
             }
 
             // Turn if needed
+            int steps = 1;
             if (target.dir != ship.Direction)
             {
                 if (ship.Direction.CostTo(target.dir) == 2)
                 {
                     result.AddTurn(Direction.Left);
                     result.AddTurn(Direction.Left);
+                    steps += 2;
                 }
                 else
                 {
                     Direction turn = ship.Direction.GetDirectionToTurn(target.dir);
                     result.AddTurn(turn);
+                    steps += 1;
                 }
                 ship.Direction = target.dir;
             }
 
             result.AddForward(1);
+            _didDock = false;
             level.MoveItem(ship, ship.Position, target.pos);
+            _estimatedStepsToFinish -= steps;
+            ship.Fuel -= CalcFuelCost(steps, ship.Speed);
         }
 
         private void PrecalcManhattanDistances(Pos target)
@@ -134,12 +160,22 @@ namespace Waldolaw
         /// <summary>
         /// Step forward cost 1 per distance. Turn left/right takes 1 step.
         /// </summary>
-        private int CalcFuelCost(int dist, int speed)
+        private int CalcFuelCost(int step, int speed)
         {
-            return dist * (1100 - (speed * 100));
+            return speed * CalcTimeCost(step, speed);
         }
 
-        Game _game;
+        /// <summary>
+        /// 1 Step is going forward 1 tile, or turn left/right once.
+        /// </summary>
+        private int CalcTimeCost(int step, int speed)
+        {
+            return step * (1100 - (speed * 100));
+        }
+
+        private Game _game;
+        private bool _didDock = false;
+        private int _estimatedStepsToFinish = 0;
         private readonly Logger _logger = LogManager.GetCurrentClassLogger();
     }
 }
