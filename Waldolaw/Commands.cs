@@ -17,32 +17,43 @@ namespace Waldolaw
     {
         public void AddForward(int steps)
         {
-            var command = new Command(CommandType.Forward, steps);
-            commands.Add(command);
-            _logger.Info($"New Command: {command.ToCommandString()}");
+            AddCommand(CreateForward(steps));
         }
         public void AddTurn(Direction direction)
         {
-            if (direction != Direction.Left && direction != Direction.Right)
-            {
-                _logger.Warn($"Got invalid direction for turn: {direction}");
-            }
-            Command command = new Command(CommandType.Turn, direction == Direction.Left ? "LEFT" : "RIGHT");
-            commands.Add(command);
-            _logger.Info($"New Command: {command.ToCommandString()}");
+            AddCommand(CreateTurn(direction));
         }
         public void AddDock(int durationMs)
         {
-            Guard.IsGreaterThanOrEqualTo(durationMs, 500);
-            Command command = new Command(CommandType.Dock, durationMs);
-            commands.Add(command);
-            _logger.Info($"New Command: {command.ToCommandString()}");
+            AddCommand(CreateDock(durationMs));
         }
         public void AddName(string name)
         {
-            Command command = new Command(CommandType.Name, name);
+            AddCommand(new Command(CommandType.Name, name));
+        }
+
+        public void AddCommand(Command command)
+        {
             commands.Add(command);
             _logger.Info($"New Command: {command.ToCommandString()}");
+        }
+
+        public static Command CreateForward(int steps)
+        {
+            return new Command(CommandType.Forward, steps);
+        }
+        public static Command CreateTurn(Direction direction)
+        {
+            if (direction != Direction.Left && direction != Direction.Right)
+            {
+                new Commands()._logger.Warn($"Got invalid direction for turn: {direction}");
+            }
+            return new Command(CommandType.Turn, direction == Direction.Left ? "LEFT" : "RIGHT");
+        }
+        public static Command CreateDock(int durationMs)
+        {
+            Guard.IsGreaterThanOrEqualTo(durationMs, 500);
+            return new Command(CommandType.Dock, durationMs);
         }
 
         public List<string> ToCommandList()
@@ -55,7 +66,7 @@ namespace Waldolaw
             return result;
         }
 
-        private struct Command
+        public struct Command
         {
             public CommandType Type;
             public int IntParam;

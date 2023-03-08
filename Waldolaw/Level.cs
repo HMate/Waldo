@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Primitives;
+﻿using CommunityToolkit.Diagnostics;
+using Microsoft.Extensions.Primitives;
 using NLog;
 using NLog.Targets;
 using System;
@@ -152,6 +153,7 @@ namespace Waldolaw
 
         internal void MoveItem(Item item, Pos currentPos, Pos newPos)
         {
+            Guard.IsTrue(GetGridCell(currentPos).Items.Contains(item));
             GetGridCell(currentPos).Items.Remove(item);
             GetGridCell(newPos).Items.Add(item);
             item.Position = newPos;

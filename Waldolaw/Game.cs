@@ -50,6 +50,11 @@ namespace Waldolaw
 
     public record struct Pos(int X, int Y)
     {
+        public static int HammingDist(Pos targetPos, Pos position)
+        {
+            return Math.Abs(targetPos.X - position.X) + Math.Abs(targetPos.Y - position.Y);
+        }
+
         public static Pos operator +(Pos self, Pos other)
         {
             return new Pos(self.X + other.X, self.Y + other.Y);

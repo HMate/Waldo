@@ -17,9 +17,6 @@ namespace Waldolaw
 
         public Commands CalculatePathToWaldo()
         {
-
-            var result = new Commands();
-            result.AddName("MATE");
             _logger.Debug($"Waldo is at {_game.Waldo.Position}");
 
             //if (_game.Waldo.Position == new Pos(1, 2))
@@ -32,6 +29,7 @@ namespace Waldolaw
             //    result.AddTurn(TurnDirection.Left);
             //    result.AddForward(2);
             //}
+            Simulator sim = new(_game);
 
             Level level = _game.Level;
             Item ship = _game.Ship;
@@ -42,7 +40,7 @@ namespace Waldolaw
 
             while (ship.Position != _game.Waldo.Position)
             {
-                DoNextStep(result, level, ship);
+                DoNextStep(sim, level, ship);
                 level.PrintLevel(ship);
             }
 
@@ -54,14 +52,14 @@ namespace Waldolaw
 
             while (ship.Position != _game.Base.Position)
             {
-                DoNextStep(result, level, ship);
+                DoNextStep(sim, level, ship);
                 level.PrintLevel(ship);
             }
 
-            return result;
+            return sim.GenerateCommands();
         }
 
-        private void DoNextStep(Commands result, Level level, Item ship)
+        private void DoNextStep(Simulator sim, Level level, Item ship)
         {
             var posItems = level.GetGridCell(ship.Position).Items;
             if (posItems.Count > 1 && posItems[0].Type == ItemType.Planet && !_didDock)
@@ -72,9 +70,8 @@ namespace Waldolaw
                 // Have to compute how much fuel we need until finish. For that we want to have full route to waldo and back.
                 // Separate DecideGoal+CalcNextStep action and DoNextStep actions.
                 // TODO: IF planet has less fuel, calculate that. 
-                var dockDuration = Math.Max(500, CalcFuelCost(_estimatedStepsToFinish, ship.Speed));
-                result.AddDock(dockDuration);
-                ship.Fuel += dockDuration;
+                var dockDuration = Math.Max(500, Simulator.CalcFuelCost(_estimatedStepsToFinish, ship.Speed));
+                sim.DoCommandDock(dockDuration);
                 _didDock = true;
                 return;
             }
@@ -98,26 +95,12 @@ namespace Waldolaw
             int steps = 1;
             if (target.dir != ship.Direction)
             {
-                if (ship.Direction.CostTo(target.dir) == 2)
-                {
-                    result.AddTurn(Direction.Left);
-                    result.AddTurn(Direction.Left);
-                    steps += 2;
-                }
-                else
-                {
-                    Direction turn = ship.Direction.GetDirectionToTurn(target.dir);
-                    result.AddTurn(turn);
-                    steps += 1;
-                }
-                ship.Direction = target.dir;
+                sim.DoCommandTurn(target.dir);
             }
 
-            result.AddForward(1);
             _didDock = false;
-            level.MoveItem(ship, ship.Position, target.pos);
             _estimatedStepsToFinish -= steps;
-            ship.Fuel -= CalcFuelCost(steps, ship.Speed);
+            sim.DoCommandForward(target.pos);
         }
 
         private void PrecalcManhattanDistances(Pos target)
@@ -155,22 +138,6 @@ namespace Waldolaw
             return !_game.Level.GetGridCell(pos).Items
                 .Exists(it =>
                 it.Type == ItemType.Satellite || it.Type == ItemType.Asteroid);
-        }
-
-        /// <summary>
-        /// Step forward cost 1 per distance. Turn left/right takes 1 step.
-        /// </summary>
-        private int CalcFuelCost(int step, int speed)
-        {
-            return speed * CalcTimeCost(step, speed);
-        }
-
-        /// <summary>
-        /// 1 Step is going forward 1 tile, or turn left/right once.
-        /// </summary>
-        private int CalcTimeCost(int step, int speed)
-        {
-            return step * (1100 - (speed * 100));
         }
 
         private Game _game;
