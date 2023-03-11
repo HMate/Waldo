@@ -38,9 +38,9 @@ namespace Waldolaw
         public static Direction GetDirectionToTurn(this Direction current, Direction target)
         {
             if (current == Direction.None || target == Direction.None) { return Direction.None; }
-            int turnCost = target - current;
+            int turnCost = current - target;
             if (turnCost == 0) { return Direction.None; }
-            if ((turnCost == 1) || (turnCost == 4))
+            if ((turnCost == -1) || (turnCost == 3))
             {
                 return Direction.Right;
             }
