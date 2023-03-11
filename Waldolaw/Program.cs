@@ -17,6 +17,8 @@ namespace Waldolaw
     {
         static void Main(string[] args)
         {
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+
             var inputsPath = args[0];
             var outputPath = args[1];
 
@@ -55,6 +57,8 @@ namespace Waldolaw
             {
                 logger.Error(ex);
             }
+
+            logger.Info("Waldolaw took {} ms to run", watch.ElapsedMilliseconds);
         }
     }
 }

@@ -60,6 +60,7 @@ namespace Waldolaw
 
         public void PrintLevel(Item ship)
         {
+#if DEBUG
             _logger.Debug($"---- LEVEL: -- SHIP FUEL: {ship.Fuel} --");
             foreach (var row in _grid)
             {
@@ -124,10 +125,12 @@ namespace Waldolaw
                 }
                 _logger.Debug(message.ToString());
             }
+#endif
         }
 
         public void PrintManhattanDistances()
         {
+#if DEBUG
             _logger.Debug("---- LEVEL DISTANCES: ----");
             foreach (var row in _grid)
             {
@@ -138,6 +141,7 @@ namespace Waldolaw
                 }
                 _logger.Debug(message.ToString());
             }
+#endif
         }
 
         public void ClearGridDistances()
@@ -167,5 +171,6 @@ namespace Waldolaw
     {
         public List<Item> Items = new();
         public int manhattanDistance = -1;
+        public Direction manhattanDirection = Direction.None;
     }
 }

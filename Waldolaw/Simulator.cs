@@ -69,17 +69,40 @@ namespace Waldolaw
             return step * (1100 - (speed * 100));
         }
 
+        public List<SimulatedCommandDock> GetDockCommands()
+        {
+            return _commands.Where(c => c.Type == CommandType.Dock).Select(c => (SimulatedCommandDock)c).ToList();
+        }
+
         internal Commands GenerateCommands()
         {
             Commands commands = new Commands();
             commands.AddName("MATE");
 
+            int forwardCount = 0;
             foreach (var command in _commands)
             {
                 foreach (var cmd in command.ToCommands())
                 {
-                    commands.AddCommand(cmd);
+                    if (cmd.Type != CommandType.Forward)
+                    {
+                        if (forwardCount > 0)
+                        {
+                            commands.AddCommand(Commands.CreateForward(forwardCount));
+                            forwardCount = 0;
+                        }
+                        commands.AddCommand(cmd);
+                    }
+                    else
+                    {
+                        forwardCount++;
+                    }
                 }
+            }
+            if (forwardCount > 0)
+            {
+                commands.AddCommand(Commands.CreateForward(forwardCount));
+                forwardCount = 0;
             }
             return commands;
         }
@@ -105,22 +128,20 @@ namespace Waldolaw
 
             public override void Do()
             {
-                Item ship = _game.Ship;
-                _steps = Pos.HammingDist(_targetPos, ship.Position);
+                _steps = Pos.HammingDist(_targetPos, _game.Ship.Position);
                 Guard.IsEqualTo(_steps, 1);
 
-                _origPos = ship.Position;
-                _game.Level.MoveItem(ship, _origPos, _targetPos);
-                ship.Fuel -= CalcFuelCost(_steps, ship.Speed);
+                _origPos = _game.Ship.Position;
+                _game.Level.MoveItem(_game.Ship, _origPos, _targetPos);
+                _game.Ship.Fuel -= CalcFuelCost(_steps, _game.Ship.Speed);
 
                 // TODO: simulate pickup turbo
             }
 
             public override void Undo()
             {
-                Item ship = _game.Ship;
-                _game.Level.MoveItem(ship, _targetPos, _origPos);
-                ship.Fuel += CalcFuelCost(_steps, ship.Speed);
+                _game.Level.MoveItem(_game.Ship, _targetPos, _origPos);
+                _game.Ship.Fuel += CalcFuelCost(_steps, _game.Ship.Speed);
             }
 
             public override List<Commands.Command> ToCommands()
@@ -156,6 +177,7 @@ namespace Waldolaw
                     _turnDir = _game.Ship.Direction.GetDirectionToTurn(_targetDir);
                     _steps = 1;
                 }
+                _game.Ship.Fuel -= CalcFuelCost(_steps, _game.Ship.Speed);
                 _game.Ship.Direction = _targetDir;
             }
 
@@ -180,30 +202,41 @@ namespace Waldolaw
                 Type = CommandType.Dock;
                 _game = game;
                 _dockDuration = dockDuration;
+                Planet = _game.Level.GetGridCell(_game.Ship.Position).Items[0];
+                Guard.IsEqualTo((int)Planet.Type, (int)ItemType.Planet);
             }
 
+            public Item Planet { get; private set; }
             private Game _game;
             private int _dockDuration;
             private int _realDockDuration;
+            private int _maxDuration;
 
             public override void Do()
             {
-                Item ship = _game.Ship;
-                Item planet = _game.Level.GetGridCell(ship.Position).Items[0];
-                Guard.IsEqualTo((int)planet.Type, (int)ItemType.Planet);
-                _realDockDuration = Math.Min(_dockDuration, planet.Fuel);
-                planet.Fuel -= _realDockDuration;
-
-                ship.Fuel += _realDockDuration;
+                _maxDuration = Planet.Fuel; // TODO: Maybe include ship tank too?
+                _realDockDuration = Math.Min(_dockDuration, Planet.Fuel);
+                Planet.Fuel -= _realDockDuration;
+                _game.Ship.Fuel += _realDockDuration;
             }
 
             public override void Undo()
             {
-                Item ship = _game.Ship;
-                Item planet = _game.Level.GetGridCell(ship.Position).Items[0];
-                Guard.IsEqualTo((int)planet.Type, (int)ItemType.Planet);
-                planet.Fuel += _realDockDuration;
-                ship.Fuel -= _realDockDuration;
+                Planet.Fuel += _realDockDuration;
+                _game.Ship.Fuel -= _realDockDuration;
+            }
+
+            /// <summary>
+            /// Alter duration of docking without recalculating simluation costs.
+            /// </summary>
+            public void PostAlterDuration(int duration)
+            {
+                _dockDuration = duration;
+            }
+
+            public int GetPossibleMaxDuration()
+            {
+                return _maxDuration;
             }
 
             public override List<Commands.Command> ToCommands()

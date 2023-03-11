@@ -19,8 +19,8 @@ namespace Waldolaw
         {
             _logger.Debug($"Waldo is at {_game.Waldo.Position}");
 
-            //if (_game.Waldo.Position == new Pos(1, 2))
             //{
+            //    Commands result = new Commands();
             //    result.AddForward(4);
             //    result.AddTurn(TurnDirection.Left);
             //    result.AddForward(2);
@@ -28,6 +28,20 @@ namespace Waldolaw
             //    result.AddForward(4);
             //    result.AddTurn(TurnDirection.Left);
             //    result.AddForward(2);
+            //    return result;
+            //}
+
+            //{
+            //    Commands result = new Commands();
+            //    result.AddForward(3);
+            //    result.AddDock(500);
+            //    result.AddForward(1);
+            //    result.AddTurn(Direction.Left);
+            //    result.AddTurn(Direction.Left);
+            //    result.AddForward(1);
+            //    result.AddDock(500);
+            //    result.AddForward(3);
+            //    return result;
             //}
             Simulator sim = new(_game);
 
@@ -36,7 +50,6 @@ namespace Waldolaw
             PrecalcManhattanDistances(_game.Waldo.Position);
             level.PrintLevel(ship);
             level.PrintManhattanDistances();
-            _estimatedStepsToFinish = level.GetGridCell(_game.Base.Position).manhattanDistance * 2;
 
             while (ship.Position != _game.Waldo.Position)
             {
@@ -48,12 +61,48 @@ namespace Waldolaw
             PrecalcManhattanDistances(_game.Base.Position);
             level.PrintLevel(ship);
             level.PrintManhattanDistances();
-            _estimatedStepsToFinish = level.GetGridCell(_game.Base.Position).manhattanDistance;
 
             while (ship.Position != _game.Base.Position)
             {
                 DoNextStep(sim, level, ship);
                 level.PrintLevel(ship);
+            }
+
+            if (ship.Fuel < 0)
+            {
+
+                List<Simulator.SimulatedCommandDock> docks = sim.GetDockCommands();
+                HashSet<Pos> visitedDocks = new();
+                int index = 0;
+                while (ship.Fuel < 0)
+                {
+                    if (index >= docks.Count)
+                    {
+                        _logger.Warn("Spent too much fuel in run!!");
+                        break;
+                    }
+
+                    Simulator.SimulatedCommandDock dock = docks[index];
+                    if (visitedDocks.Contains(dock.Planet.Position))
+                    {
+                        index++;
+                        continue;
+                    }
+                    visitedDocks.Add(dock.Planet.Position);
+
+                    int dur = dock.GetPossibleMaxDuration();
+                    if ((dur - 500) > (-ship.Fuel))
+                    {
+                        dock.PostAlterDuration(-ship.Fuel + 500);
+                        ship.Fuel = 0;
+                    }
+                    else
+                    {
+                        dock.PostAlterDuration(dur);
+                        ship.Fuel += (dur - 500);
+                        index++;
+                    }
+                }
             }
 
             return sim.GenerateCommands();
@@ -69,9 +118,7 @@ namespace Waldolaw
                 // If that is not enough, we have to compute path to next planet. - case if that is before/after waldo.
                 // Have to compute how much fuel we need until finish. For that we want to have full route to waldo and back.
                 // Separate DecideGoal+CalcNextStep action and DoNextStep actions.
-                // TODO: IF planet has less fuel, calculate that. 
-                var dockDuration = Math.Max(500, Simulator.CalcFuelCost(_estimatedStepsToFinish, ship.Speed));
-                sim.DoCommandDock(dockDuration);
+                sim.DoCommandDock(500); // Do minimal, calc actual values later once we know the route
                 _didDock = true;
                 return;
             }
@@ -80,26 +127,28 @@ namespace Waldolaw
             (int cost, Pos pos, Direction dir) target = (1000000, ship.Position, ship.Direction);
             foreach ((Pos nb, Direction dir) in nbs)
             {
-                if (level.GetGridCell(nb).manhattanDistance < 0)
+                var cell = level.GetGridCell(nb);
+                if (cell.manhattanDistance < 0)
                 {
                     continue;
                 }
-                int stepCost = level.GetGridCell(nb).manhattanDistance + 1 + ship.Direction.CostTo(dir);
+                int manhattanCost = cell.manhattanDistance + cell.manhattanDirection.CostTo(dir);
+                int stepCost = manhattanCost + 1 + ship.Direction.CostTo(dir);
+#if DEBUG
+                _logger.Debug($"Step cost to {dir} is {stepCost}");
+#endif
                 if (stepCost < target.cost)
                 {
                     target = (stepCost, nb, dir);
                 }
             }
 
-            // Turn if needed
-            int steps = 1;
             if (target.dir != ship.Direction)
             {
                 sim.DoCommandTurn(target.dir);
             }
 
             _didDock = false;
-            _estimatedStepsToFinish -= steps;
             sim.DoCommandForward(target.pos);
         }
 
@@ -116,6 +165,7 @@ namespace Waldolaw
                 (Pos pos, Direction dir) = nextCells.Dequeue();
                 List<(Pos, Direction)> nbs = level.GetNeighbours(pos);
                 int currentDist = level.GetGridCell(pos).manhattanDistance;
+                Direction currentDir = level.GetGridCell(pos).manhattanDirection;
                 foreach (var (nb, nbDir) in nbs)
                 {
                     Cell nbCell = level.GetGridCell(nb);
@@ -124,9 +174,10 @@ namespace Waldolaw
                         int cellCost = 1;
                         if (nbCell.Items.ElementAtOrDefault(0)?.Type == ItemType.Planet)
                         {
-                            cellCost = 3;
+                            cellCost = 2;
                         }
                         nbCell.manhattanDistance = currentDist + cellCost + dir.CostTo(nbDir);
+                        nbCell.manhattanDirection = nbDir.Reverse();
                         nextCells.Enqueue((nb, nbDir));
                     }
                 }
@@ -142,7 +193,6 @@ namespace Waldolaw
 
         private Game _game;
         private bool _didDock = false;
-        private int _estimatedStepsToFinish = 0;
         private readonly Logger _logger = LogManager.GetCurrentClassLogger();
     }
 }

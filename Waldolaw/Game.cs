@@ -46,6 +46,18 @@ namespace Waldolaw
             }
             return Direction.Left;
         }
+
+        public static Direction Reverse(this Direction current)
+        {
+            return current switch
+            {
+                Direction.Top => Direction.Bottom,
+                Direction.Left => Direction.Right,
+                Direction.Right => Direction.Left,
+                Direction.Bottom => Direction.Top,
+                _ => Direction.None,
+            };
+        }
     }
 
     public record struct Pos(int X, int Y)
