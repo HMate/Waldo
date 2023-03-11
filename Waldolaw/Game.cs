@@ -143,5 +143,12 @@ namespace Waldolaw
             Guard.IsNotNull(Base, $"items should contain a {nameof(Base)} entry");
             Guard.IsNotNull(Ship, $"items should contain a {nameof(Ship)} entry");
         }
+
+        internal Game Copy()
+        {
+            List<Item> items = Items.Select(i => i with { }).ToList();
+            Game copy = new Game(Level.Size, items);
+            return copy;
+        }
     }
 }

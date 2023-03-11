@@ -20,9 +20,9 @@ namespace Waldolaw
             _grid = Enumerable.Range(1, Size).Select(y => Enumerable.Range(1, Size).Select(x => new Cell()).ToArray()).ToArray();
         }
 
-        public Item? ItemAt(int x, int y)
+        public Item? ItemAt(Pos pos)
         {
-            return _grid[y][x].Items.FirstOrDefault();
+            return _grid[pos.Y][pos.X].Items.FirstOrDefault();
         }
 
         public void PlaceItem(Pos position, Item item)
@@ -137,7 +137,7 @@ namespace Waldolaw
                 StringBuilder message = new StringBuilder();
                 foreach (var cell in row)
                 {
-                    message.Append($"{cell.manhattanDistance,3}|");
+                    message.Append($"{cell.StepDistance,3}|");
                 }
                 _logger.Debug(message.ToString());
             }
@@ -150,7 +150,7 @@ namespace Waldolaw
             {
                 foreach (var cell in row)
                 {
-                    cell.manhattanDistance = -1;
+                    cell.StepDistance = -1;
                 }
             }
         }
@@ -170,7 +170,8 @@ namespace Waldolaw
     public class Cell
     {
         public List<Item> Items = new();
-        public int manhattanDistance = -1;
-        public Direction manhattanDirection = Direction.None;
+        public int StepDistance = -1;
+        public Direction FirstStepDirection = Direction.None;
+        public Direction LastStepDirection = Direction.None;
     }
 }

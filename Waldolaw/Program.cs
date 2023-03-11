@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel.Design;
 using System.Data.SqlTypes;
 using System.IO;
+using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json;
@@ -32,7 +33,7 @@ namespace Waldolaw
 
             try
             {
-                logger.Info("Waldolaw started");
+                logger.Info("😎😎😎 Waldolaw started 🌍🌍🌍");
 
                 Serializer serializer = new Serializer(inputsPath, outputPath);
                 UserInputsJSON? input = serializer.LoadInputs();

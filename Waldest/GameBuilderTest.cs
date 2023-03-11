@@ -46,9 +46,9 @@ namespace Waldest
             Game game = builder.Build(input);
 
             game.Level.Size.Should().Be(7);
-            game.Level.ItemAt(1, 2).Should().Be(game.Waldo);
-            game.Level.ItemAt(3, 6).Should().Be(game.Base);
-            game.Level.ItemAt(2, 4)!.Type.Should().Be(ItemType.Planet);
+            game.Level.ItemAt(new Pos(1, 2)).Should().Be(game.Waldo);
+            game.Level.ItemAt(new Pos(3, 6)).Should().Be(game.Base);
+            game.Level.ItemAt(new Pos(2, 4))!.Type.Should().Be(ItemType.Planet);
 
         }
 
