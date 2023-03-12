@@ -60,7 +60,7 @@ namespace Waldolaw
                 level.ClearGridDistances();
                 CalcStepDistancesToTarget(currentGame.Level, target.Position);
                 level.PrintLevel(ship);
-                level.PrintManhattanDistances();
+                level.PrintStepDistances();
 
                 int deb = 7;
                 while (ship.Position != target.Position)
@@ -97,7 +97,7 @@ namespace Waldolaw
                     it.Type == ItemType.Turbo)
                 .Select(it => it.Position)
                 .ToList();
-            var distances = CalculateTargetDistances(game.Level, possibleTargets);
+            var distances = CalculateTargetDistances(game, possibleTargets);
 
             int pathLength = 0;
             Path? completePath = null;
@@ -106,13 +106,17 @@ namespace Waldolaw
             {
                 List<Path> nextPaths = new();
                 pathLength++;
+                if (pathLength > possibleTargets.Count * 2)
+                {
+                    throw new Exception($"Failed to calc path before iteration {pathLength}");
+                }
 
                 foreach (Path prevPath in prevPaths)
                 {
                     var others = distances[prevPath.Last.Position];
                     foreach (var node in others)
                     {
-                        if (prevPath.Contains(node.pos))
+                        if (prevPath.Contains(node.pos) && !prevPath.StillWorthVisit(node.pos))
                         {
                             continue;
                         }
@@ -121,10 +125,17 @@ namespace Waldolaw
                         if (path.IsValid())
                         {
                             nextPaths.Add(path);
-
-                            if (path.IsComplete() && (completePath == null || path.Steps < completePath.Steps))
+                            if (path.IsComplete())
                             {
-                                completePath = path;
+                                _logger.Info($"Complete path: {path}");
+                                if ((completePath == null || path.Steps < completePath.Steps))
+                                {
+                                    completePath = path;
+                                }
+                            }
+                            else
+                            {
+                                _logger.Info($"Valid path: {path}");
                             }
                         }
                         else
@@ -133,10 +144,7 @@ namespace Waldolaw
                         }
                     }
                 }
-                if (pathLength > possibleTargets.Count)
-                {
-                    throw new Exception($"Failed to calc path before iteration {possibleTargets.Count}");
-                }
+                prevPaths = nextPaths;
             }
             return completePath.Nodes;
         }
@@ -146,22 +154,27 @@ namespace Waldolaw
         /// First dict contains starting positions, inner list contains end positions and steps until that pos ordered by lowest steps first.
         /// </summary>
         private Dictionary<Pos, List<(Pos pos, int steps, Direction startFacing, Direction endFacing)>>
-            CalculateTargetDistances(Level level, List<Pos> possibleTargets)
+            CalculateTargetDistances(Game game, List<Pos> possibleTargets)
         {
             Dictionary<Pos, List<(Pos pos, int steps, Direction startFacing, Direction endFacing)>> result = new();
 
+            Level level = game.Level;
             _logger.Debug($"calculating target distances for {possibleTargets.Count} targets");
+            level.PrintLevel(game.Waldo);
             foreach (Pos target in possibleTargets)
             {
                 _logger.Debug($"calculating target distances from {target}");
                 level.ClearGridDistances();
                 CalcStepDistancesToTarget(level, target);
+                //level.PrintStepDistances();
+                //level.PrintFirstStepDirections();
+
                 result[target] = new();
                 foreach (Pos otherTarget in possibleTargets)
                 {
                     if (target == otherTarget) continue;
                     var cell = level.GetGridCell(otherTarget);
-                    result[target].Add((otherTarget, cell.StepDistance, cell.FirstStepDirection, cell.LastStepDirection.Reverse()));
+                    result[target].Add((otherTarget, cell.StepDistance, cell.FirstStepDirection, cell.LastStepDirection));
                 }
                 result[target] = result[target].OrderBy(x => x.steps).ToList();
             }
@@ -192,7 +205,7 @@ namespace Waldolaw
                 {
                     continue;
                 }
-                int manhattanCost = cell.StepDistance + cell.LastStepDirection.CostTo(dir);
+                int manhattanCost = cell.StepDistance + cell.LastStepDirection.Reverse().CostTo(dir);
                 int stepCost = manhattanCost + 1 + ship.Direction.CostTo(dir);
 #if DEBUG
                 _logger.Debug($"Step cost to {dir} is {stepCost}");
@@ -236,7 +249,7 @@ namespace Waldolaw
                         //    cellCost = 2;
                         //}
                         nbCell.StepDistance = currentDist + cellCost + dir.CostTo(nbDir);
-                        nbCell.LastStepDirection = nbDir.Reverse();
+                        nbCell.LastStepDirection = nbDir;
                         nbCell.FirstStepDirection = (firstDir != Direction.None) ? firstDir : nbDir;
                         nextCells.Enqueue((nb, nbDir));
                     }
@@ -247,9 +260,9 @@ namespace Waldolaw
 
         private bool TellIfPathHaveEnoughFuel(Simulator sim, Item ship)
         {
+            int accountedFuel = 0;
             if (ship.Fuel < 0)
             {
-
                 List<Simulator.SimulatedCommandDock> docks = sim.GetDockCommands();
                 HashSet<Pos> visitedDocks = new();
                 int index = 0;
@@ -273,16 +286,19 @@ namespace Waldolaw
                     if ((dur - 500) > (-ship.Fuel))
                     {
                         dock.PostAlterDuration(-ship.Fuel + 500);
+                        accountedFuel += (-ship.Fuel + 500);
                         ship.Fuel = 0;
                     }
                     else
                     {
                         dock.PostAlterDuration(dur);
                         ship.Fuel += (dur - 500);
+                        accountedFuel += (dur - 500);
                         index++;
                     }
                 }
             }
+            _logger.Warn($"Accounted fuel: {accountedFuel}");
             return true;
         }
 

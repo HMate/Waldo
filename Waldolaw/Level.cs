@@ -76,26 +76,7 @@ namespace Waldolaw
                         Item? cellShip = cell.Items.Find(it => it.Type == ItemType.Ship);
                         if (cellShip != null)
                         {
-                            switch (ship.Direction)
-                            {
-                                case Direction.Top:
-                                    message.Append("^");
-                                    break;
-                                case Direction.Right:
-                                    message.Append(">");
-                                    break;
-                                case Direction.Bottom:
-                                    message.Append("V");
-                                    break;
-                                case Direction.Left:
-                                    message.Append("<");
-                                    break;
-                                case Direction.None:
-                                    message.Append("!");
-                                    break;
-                                default:
-                                    break;
-                            }
+                            message.Append(ship.Direction.ToAscii());
                         }
                         else if (cell.Items[0].Type == ItemType.Waldo)
                         {
@@ -128,7 +109,7 @@ namespace Waldolaw
 #endif
         }
 
-        public void PrintManhattanDistances()
+        public void PrintStepDistances()
         {
 #if DEBUG
             _logger.Debug("---- LEVEL DISTANCES: ----");
@@ -144,6 +125,22 @@ namespace Waldolaw
 #endif
         }
 
+        public void PrintFirstStepDirections()
+        {
+#if DEBUG
+            _logger.Debug("---- LEVEL FIRST DIRECTIONS: ----");
+            foreach (var row in _grid)
+            {
+                StringBuilder message = new StringBuilder();
+                foreach (var cell in row)
+                {
+                    message.Append($"{cell.FirstStepDirection.ToAscii(),3}|");
+                }
+                _logger.Debug(message.ToString());
+            }
+#endif
+        }
+
         public void ClearGridDistances()
         {
             foreach (var row in _grid)
@@ -151,6 +148,8 @@ namespace Waldolaw
                 foreach (var cell in row)
                 {
                     cell.StepDistance = -1;
+                    cell.LastStepDirection = Direction.None;
+                    cell.FirstStepDirection = Direction.None;
                 }
             }
         }

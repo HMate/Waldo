@@ -53,7 +53,8 @@ namespace Waldolaw
 
         public override string ToString()
         {
-            return string.Join(" - ", Nodes.Select(x => x.Name));
+            string planets = string.Join(" - ", Nodes.Select(x => $"{x.Name}({x.Position.X},{x.Position.Y})"));
+            return $"{planets} | FΔ={FuelAvailable - FuelCost}, F+={FuelLastFound}, S={Steps}";
         }
 
         public bool Contains(Pos pos)
@@ -75,6 +76,23 @@ namespace Waldolaw
         internal bool IsComplete()
         {
             return Last.Type == ItemType.Base && HasWaldo && IsValid();
+        }
+
+        /// <summary>
+        /// Target still worth visiting if it is Base or has fuel left on it.
+        /// </summary>
+        /// <param name="pos"></param>
+        /// <returns></returns>
+        /// <exception cref="NotImplementedException"></exception>
+        internal bool StillWorthVisit(Pos target)
+        {
+            // TODO: consider max fuel tank size while building path.
+            Item? visited = Nodes.Find(n => n.Position == target);
+            if (visited == null)
+                return true;
+            if (visited.Type == ItemType.Base)
+                return true;
+            return false;
         }
     }
 }

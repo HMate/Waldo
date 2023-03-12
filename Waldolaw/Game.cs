@@ -58,6 +58,19 @@ namespace Waldolaw
                 _ => Direction.None,
             };
         }
+
+        public static string ToAscii(this Direction current)
+        {
+
+            return current switch
+            {
+                Direction.Top => "^",
+                Direction.Right => ">",
+                Direction.Bottom => "V",
+                Direction.Left => "<",
+                _ => "!",
+            };
+        }
     }
 
     public record struct Pos(int X, int Y)
