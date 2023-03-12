@@ -1,18 +1,21 @@
 ﻿using NLog;
+using NLog.Targets;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection.Emit;
 using System.Text;
 using System.Threading.Tasks;
+using static Waldolaw.AI;
 
 namespace Waldolaw
 {
     public class AI
     {
-        public AI(Game game)
+        public AI(Game game, Timer timer)
         {
             _game = game;
+            _timer = timer;
         }
 
         public Commands CalculatePathToWaldo()
@@ -45,7 +48,10 @@ namespace Waldolaw
             //}
             Game currentGame = _game.Copy();
 
-            List<Item> targets = CalculatePathToTargets(currentGame);
+            List<Path> completePaths = CalculatePathToTargets(currentGame);
+            _logger.Info($"Found {completePaths.Count} complete paths in {_timer.TimeMs()} ms");
+
+            List<Item> targets = completePaths[0].Nodes.Skip(1).ToList(); // First is Base itself
 
             Simulator sim = new(currentGame);
 
@@ -75,13 +81,10 @@ namespace Waldolaw
             return sim.GenerateCommands();
         }
 
-        private List<Item> CalculatePathToTargets(Game game)
+        private List<Path> CalculatePathToTargets(Game game)
         {
             /**
-            - Run step weighted BFS on targets.
-            - Algo iterations:
-                - for every 1 target path, if valid -> OK
-                - if not -> for every 2 target path .. etc
+            - Run A* on targets.
             - early stop criterions:
                 - If path does not contain enough fuel, we can discard it. So only keep and build on paths with enough fuel
                 - Order target distances by stepcount, so once we reach target out of reach, we can prune further targets on that path.
@@ -99,64 +102,98 @@ namespace Waldolaw
                 .ToList();
             var distances = CalculateTargetDistances(game, possibleTargets);
 
-            int pathLength = 0;
-            Path? completePath = null;
-            List<Path> prevPaths = new() { new Path(game.Base, 0, game.Ship.Fuel, game.Ship.Speed, Direction.Top) };
-            while (completePath == null)
-            {
-                List<Path> nextPaths = new();
-                pathLength++;
-                if (pathLength > possibleTargets.Count * 2)
-                {
-                    throw new Exception($"Failed to calc path before iteration {pathLength}");
-                }
+            int waldoToBaseHeuristic = distances.DistancesTable[game.Waldo.Position][game.Base.Position].steps;
 
-                foreach (Path prevPath in prevPaths)
+
+            List<Path> completePaths = new();
+            SortedList<int, Path> pathQueue = new(new DuplicateKeyComparer<int>()) {
+                { 0, new Path(game.Base, 0, game.Ship.Fuel, game.Ship.Speed, Direction.Top) }
+            };
+            while (completePaths.Count == 0 && pathQueue.Count > 0)
+            {
+                Path prevPath = pathQueue.GetValueAtIndex(0);
+                pathQueue.RemoveAt(0);
+
+                var others = distances.OrderedDistances[prevPath.Last.Position];
+                foreach (var node in others)
                 {
-                    var others = distances[prevPath.Last.Position];
-                    foreach (var node in others)
+                    if (prevPath.Contains(node.pos) && !prevPath.StillWorthVisit(node.pos))
                     {
-                        if (prevPath.Contains(node.pos) && !prevPath.StillWorthVisit(node.pos))
+                        continue;
+                    }
+                    int addedSteps = prevPath.Facing.CostTo(node.startFacing) + node.steps;
+                    Path path = prevPath.Extend(game.Level.ItemAt(node.pos)!, addedSteps, node.endFacing);
+
+                    if (path.IsValid())
+                    {
+                        int remainingHeuristic = 0;
+                        if (path.Last.Position != game.Base.Position)
                         {
-                            continue;
+                            remainingHeuristic = (path.HasWaldo) ?
+                                distances.DistancesTable[path.Last.Position][game.Base.Position].steps
+                                : distances.DistancesTable[path.Last.Position][game.Waldo.Position].steps + waldoToBaseHeuristic;
                         }
-                        int addedSteps = prevPath.Facing.CostTo(node.startFacing) + node.steps;
-                        Path path = prevPath.Extend(game.Level.ItemAt(node.pos)!, addedSteps, node.endFacing);
-                        if (path.IsValid())
+
+                        int heuristic = path.Steps + remainingHeuristic;
+                        pathQueue.Add(heuristic, path);
+                        if (path.IsComplete())
                         {
-                            nextPaths.Add(path);
-                            if (path.IsComplete())
-                            {
-                                _logger.Info($"Complete path: {path}");
-                                if ((completePath == null || path.Steps < completePath.Steps))
-                                {
-                                    completePath = path;
-                                }
-                            }
-                            else
-                            {
-                                _logger.Info($"Valid path: {path}");
-                            }
+                            _logger.Info($"Complete path: {path}, H: {heuristic}");
+                            completePaths.Add(path);
                         }
                         else
                         {
-                            break;
+                            _logger.Info($"Valid path: {path}, H: {heuristic}");
+                        }
+                        if (_timer.TimeMs() > 3950)
+                        {
+                            _logger.Error($"Failed to calc path before timeout. Took {_timer.TimeMs()} ms");
+                            completePaths.Add(path);
+                            return completePaths;
                         }
                     }
+                    else
+                    {
+                        break;
+                    }
                 }
-                prevPaths = nextPaths;
+
             }
-            return completePath.Nodes;
+            // completePaths = completePaths.OrderBy(p => p.Steps).ToList();
+            return completePaths;
+        }
+
+        public class DuplicateKeyComparer<TKey> : IComparer<TKey> where TKey : IComparable
+        {
+            public int Compare(TKey? x, TKey? y)
+            {
+                if (x == null || y == null)
+                {
+                    return 0;
+                }
+                int result = x.CompareTo(y);
+
+                if (result == 0)
+                    return 1; // Handle equality as being greater. Note: this will break Remove(key) or
+                else          // IndexOfKey(key) since the comparer never returns 0 to signal key equality
+                    return result;
+            }
+        }
+
+        class TargetDistancesStore
+        {
+            public record struct DistanceEntry(Pos pos, int steps, Direction startFacing, Direction endFacing);
+            public Dictionary<Pos, List<DistanceEntry>> OrderedDistances = new();
+            public Dictionary<Pos, Dictionary<Pos, DistanceEntry>> DistancesTable = new();
         }
 
         /// <summary>
         /// Calculate step counts from all possible targets to all other possible targets.
         /// First dict contains starting positions, inner list contains end positions and steps until that pos ordered by lowest steps first.
         /// </summary>
-        private Dictionary<Pos, List<(Pos pos, int steps, Direction startFacing, Direction endFacing)>>
-            CalculateTargetDistances(Game game, List<Pos> possibleTargets)
+        private TargetDistancesStore CalculateTargetDistances(Game game, List<Pos> possibleTargets)
         {
-            Dictionary<Pos, List<(Pos pos, int steps, Direction startFacing, Direction endFacing)>> result = new();
+            TargetDistancesStore result = new();
 
             Level level = game.Level;
             _logger.Debug($"calculating target distances for {possibleTargets.Count} targets");
@@ -169,14 +206,18 @@ namespace Waldolaw
                 //level.PrintStepDistances();
                 //level.PrintFirstStepDirections();
 
-                result[target] = new();
+                result.OrderedDistances[target] = new();
+                result.DistancesTable[target] = new();
                 foreach (Pos otherTarget in possibleTargets)
                 {
                     if (target == otherTarget) continue;
                     var cell = level.GetGridCell(otherTarget);
-                    result[target].Add((otherTarget, cell.StepDistance, cell.FirstStepDirection, cell.LastStepDirection));
+                    var entry = new TargetDistancesStore.DistanceEntry(
+                            otherTarget, cell.StepDistance, cell.FirstStepDirection, cell.LastStepDirection);
+                    result.OrderedDistances[target].Add(entry);
+                    result.DistancesTable[target].Add(otherTarget, entry);
                 }
-                result[target] = result[target].OrderBy(x => x.steps).ToList();
+                result.OrderedDistances[target] = result.OrderedDistances[target].OrderBy(x => x.steps).ToList();
             }
             return result;
         }
@@ -310,6 +351,7 @@ namespace Waldolaw
         }
 
         private Game _game;
+        private Timer _timer;
         private bool _didDock = false;
         private readonly Logger _logger = LogManager.GetCurrentClassLogger();
     }

@@ -18,7 +18,7 @@ namespace Waldolaw
     {
         static void Main(string[] args)
         {
-            var watch = System.Diagnostics.Stopwatch.StartNew();
+            Timer timer = new();
 
             var inputsPath = args[0];
             var outputPath = args[1];
@@ -28,7 +28,7 @@ namespace Waldolaw
             {
                 builder.ForLogger().WriteToConsole(layout);
                 builder.ForLogger().WriteToDebugConditional(layout);
-                builder.ForLogger().WriteToFile(fileName: "waldolaw.log", layout);
+                builder.ForLogger().WriteToFile(fileName: "waldolaw.log", layout, archiveAboveSize: 20000, maxArchiveFiles: 5);
             }).GetCurrentClassLogger();
 
             try
@@ -49,7 +49,7 @@ namespace Waldolaw
                     logger.Info($"{item}");
                 }
 
-                Commands commands = new AI(game).CalculatePathToWaldo();
+                Commands commands = new AI(game, timer).CalculatePathToWaldo();
 
                 serializer.SaveOutputs(commands.ToCommandList());
 
@@ -59,7 +59,7 @@ namespace Waldolaw
                 logger.Error(ex);
             }
 
-            logger.Info("Waldolaw took {} ms to run", watch.ElapsedMilliseconds);
+            logger.Info("Waldolaw took {} ms to run", timer.TimeMs());
         }
     }
 }
