@@ -69,6 +69,13 @@ namespace Waldolaw
             return step * (1100 - (speed * 100));
         }
 
+        public static bool IsPassable(Level level, Pos pos)
+        {
+            return !level.GetGridCell(pos).Items
+                .Exists(it =>
+                it.Type == ItemType.Satellite || it.Type == ItemType.Asteroid);
+        }
+
         public List<SimulatedCommandDock> GetDockCommands()
         {
             return _commands.Where(c => c.Type == CommandType.Dock).Select(c => (SimulatedCommandDock)c).ToList();

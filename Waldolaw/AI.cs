@@ -281,14 +281,9 @@ namespace Waldolaw
                 foreach (var (nb, nbDir) in nbs)
                 {
                     Cell nbCell = level.GetGridCell(nb);
-                    if (nbCell.StepDistance < 0 && IsPassable(level, nb))
+                    if (nbCell.StepDistance < 0 && Simulator.IsPassable(level, nb))
                     {
                         int cellCost = 1;
-                        // TODO: For now we dont care about time constraint. Planet does not increase fuel cost.
-                        //if (nbCell.Items.ElementAtOrDefault(0)?.Type == ItemType.Planet)
-                        //{
-                        //    cellCost = 2;
-                        //}
                         nbCell.StepDistance = currentDist + cellCost + dir.CostTo(nbDir);
                         nbCell.LastStepDirection = nbDir;
                         nbCell.FirstStepDirection = (firstDir != Direction.None) ? firstDir : nbDir;
@@ -298,10 +293,10 @@ namespace Waldolaw
             }
         }
 
-
         private bool TellIfPathHaveEnoughFuel(Simulator sim, Item ship)
         {
             int accountedFuel = 0;
+            _logger.Warn($"Ship fuel deficit: {ship.Fuel}");
             if (ship.Fuel < 0)
             {
                 List<Simulator.SimulatedCommandDock> docks = sim.GetDockCommands();
@@ -341,13 +336,6 @@ namespace Waldolaw
             }
             _logger.Warn($"Accounted fuel: {accountedFuel}");
             return true;
-        }
-
-        private bool IsPassable(Level level, Pos pos)
-        {
-            return !level.GetGridCell(pos).Items
-                .Exists(it =>
-                it.Type == ItemType.Satellite || it.Type == ItemType.Asteroid);
         }
 
         private Game _game;

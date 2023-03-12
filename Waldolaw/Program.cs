@@ -28,7 +28,7 @@ namespace Waldolaw
             {
                 builder.ForLogger().WriteToConsole(layout);
                 builder.ForLogger().WriteToDebugConditional(layout);
-                builder.ForLogger().WriteToFile(fileName: "waldolaw.log", layout, archiveAboveSize: 20000, maxArchiveFiles: 5);
+                builder.ForLogger().WriteToFile(fileName: "waldolaw.log", layout, archiveAboveSize: 2000000, maxArchiveFiles: 5);
             }).GetCurrentClassLogger();
 
             try
