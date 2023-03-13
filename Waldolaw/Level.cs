@@ -30,6 +30,19 @@ namespace Waldolaw
             GetGridCell(position).Items.Add(item);
         }
 
+        internal void RemoveItem(Pos position, Item item)
+        {
+            GetGridCell(position).Items.Remove(item);
+        }
+
+        internal void MoveItem(Item item, Pos currentPos, Pos newPos)
+        {
+            Guard.IsTrue(GetGridCell(currentPos).Items.Contains(item));
+            GetGridCell(currentPos).Items.Remove(item);
+            GetGridCell(newPos).Items.Add(item);
+            item.Position = newPos;
+        }
+
         public Cell GetGridCell(Pos pos)
         {
             return _grid[pos.Y][pos.X];
@@ -152,14 +165,6 @@ namespace Waldolaw
                     cell.FirstStepDirection = Direction.None;
                 }
             }
-        }
-
-        internal void MoveItem(Item item, Pos currentPos, Pos newPos)
-        {
-            Guard.IsTrue(GetGridCell(currentPos).Items.Contains(item));
-            GetGridCell(currentPos).Items.Remove(item);
-            GetGridCell(newPos).Items.Add(item);
-            item.Position = newPos;
         }
 
         private readonly Cell[][] _grid;

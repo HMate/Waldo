@@ -132,6 +132,7 @@ namespace Waldolaw
             private Pos _targetPos;
             private Pos _origPos;
             private int _steps = 0;
+            private Item? _pickedTurbo = null;
 
             public override void Do()
             {
@@ -142,11 +143,25 @@ namespace Waldolaw
                 _game.Level.MoveItem(_game.Ship, _origPos, _targetPos);
                 _game.Ship.Fuel -= CalcFuelCost(_steps, _game.Ship.Speed);
 
-                // TODO: simulate pickup turbo
+                // simulate pickup turbo
+                var targetItems = _game.Level.GetGridCell(_targetPos).Items;
+                if (targetItems.Count > 0
+                    && targetItems[0].Type == ItemType.Turbo
+                    && _game.Ship.Speed < _game.MaxSpeed)
+                {
+                    _pickedTurbo = targetItems[0];
+                    _game.Ship.Speed += 1;
+                    _game.Level.RemoveItem(_targetPos, targetItems[0]);
+                }
             }
 
             public override void Undo()
             {
+                if (_pickedTurbo != null)
+                {
+                    _game.Ship.Speed -= 1;
+                    _game.Level.PlaceItem(_targetPos, _pickedTurbo);
+                }
                 _game.Level.MoveItem(_game.Ship, _targetPos, _origPos);
                 _game.Ship.Fuel += CalcFuelCost(_steps, _game.Ship.Speed);
             }
