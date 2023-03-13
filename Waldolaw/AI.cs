@@ -76,7 +76,7 @@ namespace Waldolaw
                 }
             }
 
-            bool isPathGood = TellIfPathHaveEnoughFuel(sim, ship);
+            bool isPathGood = TellIfPathHaveEnoughFuel(sim, currentGame, ship);
 
             return sim.GenerateCommands();
         }
@@ -293,14 +293,21 @@ namespace Waldolaw
             }
         }
 
-        private bool TellIfPathHaveEnoughFuel(Simulator sim, Item ship)
+        private bool TellIfPathHaveEnoughFuel(Simulator sim, Game game, Item ship)
         {
             int accountedFuel = 0;
             _logger.Warn($"Ship fuel deficit: {ship.Fuel}");
             if (ship.Fuel < 0)
             {
                 List<Simulator.SimulatedCommandDock> docks = sim.GetDockCommands();
-                HashSet<Pos> visitedDocks = new();
+
+                foreach (var stop in docks)
+                {
+                    // Lets set every dock to 0 for cleaner calculation
+                    stop.Undo();
+                }
+                _logger.Warn($"Ship fuel deficit after dock resets: {ship.Fuel}");
+
                 int index = 0;
                 while (ship.Fuel < 0)
                 {
@@ -311,27 +318,35 @@ namespace Waldolaw
                     }
 
                     Simulator.SimulatedCommandDock dock = docks[index];
-                    if (visitedDocks.Contains(dock.Planet.Position))
-                    {
-                        index++;
-                        continue;
-                    }
-                    visitedDocks.Add(dock.Planet.Position);
 
-                    int dur = dock.GetPossibleMaxDuration();
-                    if ((dur - 500) > (-ship.Fuel))
+                    int shipFuelAtStop = dock.ShipFuelWhenArrived + accountedFuel;
+                    if (shipFuelAtStop < 0)
                     {
-                        dock.PostAlterDuration(-ship.Fuel + 500);
-                        accountedFuel += (-ship.Fuel + 500);
+                        _logger.Warn($"Underestimated fuel consumption until dock {index}");
+                        return false;
+                    }
+                    int maxDurAtStop = Math.Min(dock.Planet.Fuel, game.MaxFuel - shipFuelAtStop);
+
+                    if (maxDurAtStop >= (-ship.Fuel))
+                    {
+                        dock.PostAlterDuration(-ship.Fuel);
+                        accountedFuel += -ship.Fuel;
+                        dock.Planet.Fuel -= -ship.Fuel;
                         ship.Fuel = 0;
                     }
                     else
                     {
-                        dock.PostAlterDuration(dur);
-                        ship.Fuel += (dur - 500);
-                        accountedFuel += (dur - 500);
-                        index++;
+                        dock.PostAlterDuration(maxDurAtStop);
+                        ship.Fuel += maxDurAtStop;
+                        dock.Planet.Fuel -= maxDurAtStop;
+                        accountedFuel += maxDurAtStop - 500;
                     }
+                    index++;
+                }
+                for (; index < docks.Count; index++)
+                {
+                    Simulator.SimulatedCommandDock dock = docks[index];
+                    dock.PostAlterDuration(500); // Have to do minimum duration rest of stops
                 }
             }
             _logger.Warn($"Accounted fuel: {accountedFuel}");

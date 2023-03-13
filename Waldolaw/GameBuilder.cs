@@ -34,7 +34,7 @@ namespace Waldolaw
             items.Add(new Item("BASE", ItemType.Base, new Pos((input.mapsize - 1) / 2, input.mapsize - 1), 0));
             items.Add(new Item("SHIP", ItemType.Ship, new Pos((input.mapsize - 1) / 2, input.mapsize - 1), input.fuel));
 
-            return new Game(input.mapsize, items);
+            return new Game(input.mapsize, input.max_fuel, input.max_speed, items);
         }
 
         private int GetSatelliteDistance(string name, List<DistancesJSON> distances)

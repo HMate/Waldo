@@ -211,26 +211,29 @@ namespace Waldolaw
                 _dockDuration = dockDuration;
                 Planet = _game.Level.GetGridCell(_game.Ship.Position).Items[0];
                 Guard.IsEqualTo((int)Planet.Type, (int)ItemType.Planet);
+                ShipFuelWhenArrived = game.Ship.Fuel;
             }
 
             public Item Planet { get; private set; }
+            public int ShipFuelWhenArrived { get; private set; }
+            public int RealDockDuration { get; private set; }
+
             private Game _game;
             private int _dockDuration;
-            private int _realDockDuration;
             private int _maxDuration;
 
             public override void Do()
             {
                 _maxDuration = Planet.Fuel; // TODO: Maybe include ship tank too?
-                _realDockDuration = Math.Min(_dockDuration, Planet.Fuel);
-                Planet.Fuel -= _realDockDuration;
-                _game.Ship.Fuel += _realDockDuration;
+                RealDockDuration = Math.Min(_dockDuration, Planet.Fuel);
+                Planet.Fuel -= RealDockDuration;
+                _game.Ship.Fuel += RealDockDuration;
             }
 
             public override void Undo()
             {
-                Planet.Fuel += _realDockDuration;
-                _game.Ship.Fuel -= _realDockDuration;
+                Planet.Fuel += RealDockDuration;
+                _game.Ship.Fuel -= RealDockDuration;
             }
 
             /// <summary>
@@ -239,11 +242,6 @@ namespace Waldolaw
             public void PostAlterDuration(int duration)
             {
                 _dockDuration = duration;
-            }
-
-            public int GetPossibleMaxDuration()
-            {
-                return _maxDuration;
             }
 
             public override List<Commands.Command> ToCommands()

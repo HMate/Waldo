@@ -124,16 +124,20 @@ namespace Waldolaw
     public class Game
     {
         public Level Level { get; private set; }
+        public int MaxFuel { get; private set; }
+        public int MaxSpeed { get; private set; }
         public List<Item> Items { get; private set; }
 
         public Item Waldo { get; private set; }
         public Item Base { get; private set; }
         public Item Ship { get; private set; }
 
-        public Game(int mapSize, List<Item> items)
+        public Game(int mapSize, int maxFuel, int maxSpeed, List<Item> items)
         {
             Level = new Level(mapSize);
             Items = items;
+            MaxFuel = maxFuel;
+            MaxSpeed = maxSpeed;
 
             foreach (Item item in Items)
             {
@@ -160,7 +164,7 @@ namespace Waldolaw
         internal Game Copy()
         {
             List<Item> items = Items.Select(i => i with { }).ToList();
-            Game copy = new Game(Level.Size, items);
+            Game copy = new Game(Level.Size, MaxFuel, MaxSpeed, items);
             return copy;
         }
     }
