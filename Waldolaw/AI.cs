@@ -24,30 +24,6 @@ namespace Waldolaw
         {
             _logger.Debug($"Waldo is at {_game.Waldo.Position}");
 
-            //{
-            //    Commands result = new Commands();
-            //    result.AddForward(4);
-            //    result.AddTurn(TurnDirection.Left);
-            //    result.AddForward(2);
-            //    result.AddTurn(TurnDirection.Left);
-            //    result.AddForward(4);
-            //    result.AddTurn(TurnDirection.Left);
-            //    result.AddForward(2);
-            //    return result;
-            //}
-
-            //{
-            //    Commands result = new Commands();
-            //    result.AddForward(3);
-            //    result.AddDock(500);
-            //    result.AddForward(1);
-            //    result.AddTurn(Direction.Left);
-            //    result.AddTurn(Direction.Left);
-            //    result.AddForward(1);
-            //    result.AddDock(500);
-            //    result.AddForward(3);
-            //    return result;
-            //}
             Game currentGame = _game.Copy();
 
             List<Path> completePaths = CalculatePathToTargets(currentGame);
@@ -151,7 +127,6 @@ namespace Waldolaw
             const long lastCallTimeout = 3400;
             while (pathQueue.Count > 0 &&
                 ((completePaths.Count > 0 && _timer.TimeMs() < timeout) || (completePaths.Count == 0)))
-            //while (pathQueue.Count > 0 && (completePaths.Count == 0))
             {
                 Path prevPath = pathQueue.GetValueAtIndex(0);
                 pathQueue.RemoveAt(0);
@@ -201,7 +176,6 @@ namespace Waldolaw
                 }
 
             }
-            // completePaths = completePaths.OrderBy(p => p.Steps).ToList();
             return completePaths;
         }
 
@@ -269,11 +243,6 @@ namespace Waldolaw
             var posItems = level.GetGridCell(ship.Position).Items;
             if (posItems.Count > 1 && posItems[0].Type == ItemType.Planet && !_didDock)
             {
-                // TODO: We have to foresee how many planets are on our way.
-                // If this is the last, we should tank up as man fuel as possible. If that is enough to finish the level, OK.
-                // If that is not enough, we have to compute path to next planet. - case if that is before/after waldo.
-                // Have to compute how much fuel we need until finish. For that we want to have full route to waldo and back.
-                // Separate DecideGoal+CalcNextStep action and DoNextStep actions.
                 sim.DoCommandDock(500); // Do minimal, calc actual values later once we know the route
                 _didDock = true;
                 return;
