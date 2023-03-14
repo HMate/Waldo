@@ -5,7 +5,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection.Emit;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
+using static System.Formats.Asn1.AsnWriter;
 using static Waldolaw.AI;
 
 namespace Waldolaw
@@ -18,7 +20,7 @@ namespace Waldolaw
             _timer = timer;
         }
 
-        public Commands CalculatePathToWaldo()
+        public Commands? CalculatePathToWaldo()
         {
             _logger.Debug($"Waldo is at {_game.Waldo.Position}");
 
@@ -51,34 +53,71 @@ namespace Waldolaw
             List<Path> completePaths = CalculatePathToTargets(currentGame);
             _logger.Info($"Found {completePaths.Count} complete paths in {_timer.TimeMs()} ms");
 
-            List<Item> targets = completePaths[0].Nodes.Skip(1).ToList(); // First is Base itself
+            Commands? bestCommands = null;
+            float bestScore = 10000000;
+            int pathIndex = 0;
+            int bestIndex = -1;
 
-            Simulator sim = new(currentGame);
-
-            //List<Item> targets = new() { currentGame.Waldo, currentGame.Base };
-
-            Level level = currentGame.Level;
-            Item ship = currentGame.Ship;
-
-            foreach (Item target in targets)
+            foreach (var path in completePaths)
             {
-                _logger.Debug($"Going to target {target.Name} at {target.Position}");
-                level.ClearGridDistances();
-                CalcStepDistancesToTarget(currentGame.Level, target.Position);
-                level.PrintLevel(ship);
-                level.PrintStepDistances();
-
-                int deb = 7;
-                while (ship.Position != target.Position)
+                pathIndex++;
+                if (_timer.TimeMs() > 3950)
                 {
-                    DoNextStep(sim, level, ship);
+                    break;
+                }
+                _logger.Debug($"Simulating path #{pathIndex} {path}");
+                List<Item> targets = path.Nodes.Skip(1).ToList(); // First is Base itself
+
+                currentGame = _game.Copy();
+                Simulator sim = new(currentGame);
+
+                Level level = currentGame.Level;
+                Item ship = currentGame.Ship;
+
+                foreach (Item target in targets)
+                {
+#if DEBUG
+                    _logger.Debug($"Going to target {target.Name} at {target.Position}");
+#endif
+                    level.ClearGridDistances();
+                    CalcStepDistancesToTarget(currentGame.Level, target.Position);
                     level.PrintLevel(ship);
+                    level.PrintStepDistances();
+
+                    int deb = 7;
+                    while (ship.Position != target.Position)
+                    {
+                        DoNextStep(sim, level, ship);
+                        level.PrintLevel(ship);
+                    }
+                }
+
+                bool isPathGood = AllocateFuelAmongDocks(sim, currentGame, ship);
+                if (bestCommands == null)
+                {
+                    FixFuels(sim);
+                    bestCommands = sim.GenerateCommands().commands;
+                    bestIndex = pathIndex;
+                }
+                if (isPathGood)
+                {
+                    (Commands commands, float timeCost) = sim.GenerateCommands();
+                    float score = commands.Count + timeCost;
+                    if (score < bestScore)
+                    {
+                        bestCommands = commands;
+                        bestScore = score;
+                        bestIndex = pathIndex;
+                        _logger.Info($"Path #{pathIndex} has score {score}={commands.Count}+{timeCost}. New best score.");
+                    }
+                    else
+                    {
+                        _logger.Info($"Path #{pathIndex} has score {score}={commands.Count}+{timeCost}.");
+                    }
                 }
             }
-
-            bool isPathGood = TellIfPathHaveEnoughFuel(sim, currentGame, ship);
-
-            return sim.GenerateCommands();
+            _logger.Info($"Using path #{bestIndex} with score {bestScore}");
+            return bestCommands;
         }
 
         private List<Path> CalculatePathToTargets(Game game)
@@ -100,16 +139,19 @@ namespace Waldolaw
                     it.Type == ItemType.Turbo)
                 .Select(it => it.Position)
                 .ToList();
+
             var distances = CalculateTargetDistances(game, possibleTargets);
-
             int waldoToBaseHeuristic = distances.DistancesTable[game.Waldo.Position][game.Base.Position].steps;
-
 
             List<Path> completePaths = new();
             SortedList<int, Path> pathQueue = new(new DuplicateKeyComparer<int>()) {
                 { 0, new Path(game.Base, 0, game.Ship.Fuel, game.Ship.Speed, Direction.Top) }
             };
-            while (completePaths.Count == 0 && pathQueue.Count > 0)
+            const long timeout = 2000;
+            const long lastCallTimeout = 3400;
+            while (pathQueue.Count > 0 &&
+                ((completePaths.Count > 0 && _timer.TimeMs() < timeout) || (completePaths.Count == 0)))
+            //while (pathQueue.Count > 0 && (completePaths.Count == 0))
             {
                 Path prevPath = pathQueue.GetValueAtIndex(0);
                 pathQueue.RemoveAt(0);
@@ -145,7 +187,7 @@ namespace Waldolaw
                         {
                             _logger.Info($"Valid path: {path}, H: {heuristic}");
                         }
-                        if (_timer.TimeMs() > 3950)
+                        if (_timer.TimeMs() > lastCallTimeout)
                         {
                             _logger.Error($"Failed to calc path before timeout. Took {_timer.TimeMs()} ms");
                             completePaths.Add(path);
@@ -293,7 +335,7 @@ namespace Waldolaw
             }
         }
 
-        private bool TellIfPathHaveEnoughFuel(Simulator sim, Game game, Item ship)
+        private bool AllocateFuelAmongDocks(Simulator sim, Game game, Item ship)
         {
             int accountedFuel = 0;
             _logger.Warn($"Ship fuel deficit: {ship.Fuel}");
@@ -313,7 +355,7 @@ namespace Waldolaw
                 {
                     if (index >= docks.Count)
                     {
-                        _logger.Warn("Spent too much fuel in run!!");
+                        _logger.Warn("Spent too much fuel in run, path not good!");
                         return false;
                     }
 
@@ -322,24 +364,37 @@ namespace Waldolaw
                     int shipFuelAtStop = dock.ShipFuelWhenArrived + accountedFuel;
                     if (shipFuelAtStop < 0)
                     {
-                        _logger.Warn($"Underestimated fuel consumption until dock {index}");
+                        _logger.Warn($"Underestimated fuel consumption until dock {index}, path not good!");
                         return false;
                     }
-                    int maxDurAtStop = Math.Min(dock.Planet.Fuel, game.MaxFuel - shipFuelAtStop);
+                    int maxFuelAtStop = Math.Min(dock.Planet.Fuel, game.MaxFuel - shipFuelAtStop);
 
-                    if (maxDurAtStop >= (-ship.Fuel))
+                    if (maxFuelAtStop >= (-ship.Fuel))
                     {
-                        dock.PostAlterDuration(-ship.Fuel);
-                        accountedFuel += -ship.Fuel;
-                        dock.Planet.Fuel -= -ship.Fuel;
-                        ship.Fuel = 0;
+                        int duration = -ship.Fuel;
+                        int fuel = -ship.Fuel;
+                        if (duration < 500)
+                        {
+                            duration = 500;
+                            fuel = Math.Min(maxFuelAtStop, 500);
+                        }
+                        dock.PostAlterDuration(duration);
+                        accountedFuel += fuel;
+                        dock.Planet.Fuel -= fuel;
+                        ship.Fuel += fuel;
                     }
                     else
                     {
-                        dock.PostAlterDuration(maxDurAtStop);
-                        ship.Fuel += maxDurAtStop;
-                        dock.Planet.Fuel -= maxDurAtStop;
-                        accountedFuel += maxDurAtStop - 500;
+                        int duration = maxFuelAtStop;
+                        int fuel = maxFuelAtStop;
+                        if (duration < 500)
+                        {
+                            duration = 500;
+                        }
+                        dock.PostAlterDuration(duration);
+                        ship.Fuel += fuel;
+                        dock.Planet.Fuel -= fuel;
+                        accountedFuel += fuel - 500;
                     }
                     index++;
                 }
@@ -349,8 +404,21 @@ namespace Waldolaw
                     dock.PostAlterDuration(500); // Have to do minimum duration rest of stops
                 }
             }
-            _logger.Warn($"Accounted fuel: {accountedFuel}");
+            _logger.Warn($"Accounted fuel: {accountedFuel}, ship fuel: {ship.Fuel}");
             return true;
+        }
+
+        private void FixFuels(Simulator sim)
+        {
+            List<Simulator.SimulatedCommandDock> docks = sim.GetDockCommands();
+
+            foreach (var stop in docks)
+            {
+                if (stop.DockDuration < 500)
+                {
+                    stop.PostAlterDuration(500);
+                }
+            }
         }
 
         private Game _game;

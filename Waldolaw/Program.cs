@@ -49,9 +49,12 @@ namespace Waldolaw
                     logger.Info($"{item}");
                 }
 
-                Commands commands = new AI(game, timer).CalculatePathToWaldo();
+                Commands? commands = new AI(game, timer).CalculatePathToWaldo();
 
-                serializer.SaveOutputs(commands.ToCommandList());
+                if (commands != null)
+                    serializer.SaveOutputs(commands.ToCommandList());
+                else
+                    logger.Error("Couldn't find a solution :(");
 
             }
             catch (Exception ex)

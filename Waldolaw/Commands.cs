@@ -15,6 +15,8 @@ namespace Waldolaw
 
     public class Commands
     {
+        public int Count { get; private set; }
+
         public void AddForward(int steps)
         {
             AddCommand(CreateForward(steps));
@@ -35,7 +37,10 @@ namespace Waldolaw
         public void AddCommand(Command command)
         {
             commands.Add(command);
-            _logger.Info($"New Command: {command.ToCommandString()}");
+            if (command.Type != CommandType.Name)
+            {
+                Count += 1;
+            }
         }
 
         public static Command CreateForward(int steps)
@@ -62,6 +67,7 @@ namespace Waldolaw
             foreach (var command in commands)
             {
                 result.Add(command.ToCommandString());
+                _logger.Info($"New Command: {command.ToCommandString()}");
             }
             return result;
         }

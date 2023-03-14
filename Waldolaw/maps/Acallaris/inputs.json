@@ -1,38 +1,42 @@
 {
-  "mapsize": 7,
-  "fuel": 10000,
+  "mapsize": 11,
+  "fuel": 16000,
   "speed": 1,
   "max_speed": 6,
-  "max_fuel": 20000,
+  "max_fuel": 26000,
   "items": [
     {
-      "name": "PLANET_0a88",
+      "name": "WALDO_06a1",
       "distances": [
         {
-          "Distance": 9,
-          "SatelliteName": "SAT_3"
+          "Distance": 12,
+          "SatelliteName": "SAT_2"
         },
         {
-          "Distance": 3,
+          "Distance": 2,
           "SatelliteName": "SAT_0"
         },
         {
-          "Distance": 9,
+          "Distance": 8,
           "SatelliteName": "SAT_1"
         },
         {
-          "Distance": 3,
-          "SatelliteName": "SAT_2"
+          "Distance": 18,
+          "SatelliteName": "SAT_3"
         }
       ],
-      "fuel": 10000
+      "fuel": -1
     },
     {
-      "name": "PLANET_532f",
+      "name": "PLANET_3a39",
       "distances": [
         {
-          "Distance": 6,
+          "Distance": 14,
           "SatelliteName": "SAT_1"
+        },
+        {
+          "Distance": 10,
+          "SatelliteName": "SAT_0"
         },
         {
           "Distance": 10,
@@ -41,211 +45,229 @@
         {
           "Distance": 6,
           "SatelliteName": "SAT_2"
-        },
-        {
-          "Distance": 2,
-          "SatelliteName": "SAT_0"
         }
       ],
-      "fuel": 10000
+      "fuel": 7000
     },
     {
-      "name": "PLANET_70d4",
+      "name": "ASTEROID_5964",
       "distances": [
         {
-          "Distance": 2,
+          "Distance": 14,
           "SatelliteName": "SAT_2"
-        },
-        {
-          "Distance": 10,
-          "SatelliteName": "SAT_1"
         },
         {
           "Distance": 6,
-          "SatelliteName": "SAT_3"
-        },
-        {
-          "Distance": 6,
-          "SatelliteName": "SAT_0"
-        }
-      ],
-      "fuel": 10000
-    },
-    {
-      "name": "PLANET_ac82",
-      "distances": [
-        {
-          "Distance": 5,
           "SatelliteName": "SAT_1"
         },
         {
-          "Distance": 7,
+          "Distance": 16,
           "SatelliteName": "SAT_3"
         },
-        {
-          "Distance": 7,
-          "SatelliteName": "SAT_2"
-        },
-        {
-          "Distance": 5,
-          "SatelliteName": "SAT_0"
-        }
-      ],
-      "fuel": 10000
-    },
-    {
-      "name": "PLANET_4562",
-      "distances": [
-        {
-          "Distance": 5,
-          "SatelliteName": "SAT_2"
-        },
-        {
-          "Distance": 7,
-          "SatelliteName": "SAT_0"
-        },
-        {
-          "Distance": 7,
-          "SatelliteName": "SAT_1"
-        },
-        {
-          "Distance": 5,
-          "SatelliteName": "SAT_3"
-        }
-      ],
-      "fuel": 10000
-    },
-    {
-      "name": "ASTEROID_f934",
-      "distances": [
         {
           "Distance": 4,
           "SatelliteName": "SAT_0"
+        }
+      ],
+      "fuel": -1
+    },
+    {
+      "name": "PLANET_08b1",
+      "distances": [
+        {
+          "Distance": 6,
+          "SatelliteName": "SAT_0"
         },
         {
-          "Distance": 2,
+          "Distance": 12,
+          "SatelliteName": "SAT_2"
+        },
+        {
+          "Distance": 14,
+          "SatelliteName": "SAT_3"
+        },
+        {
+          "Distance": 8,
+          "SatelliteName": "SAT_1"
+        }
+      ],
+      "fuel": 0
+    },
+    {
+      "name": "PLANET_ce5c",
+      "distances": [
+        {
+          "Distance": 8,
+          "SatelliteName": "SAT_2"
+        },
+        {
+          "Distance": 10,
+          "SatelliteName": "SAT_0"
+        },
+        {
+          "Distance": 10,
+          "SatelliteName": "SAT_3"
+        },
+        {
+          "Distance": 12,
+          "SatelliteName": "SAT_1"
+        }
+      ],
+      "fuel": 12000
+    },
+    {
+      "name": "ASTEROID_1b6a",
+      "distances": [
+        {
+          "Distance": 11,
+          "SatelliteName": "SAT_0"
+        },
+        {
+          "Distance": 13,
           "SatelliteName": "SAT_1"
         },
+        {
+          "Distance": 7,
+          "SatelliteName": "SAT_2"
+        },
+        {
+          "Distance": 9,
+          "SatelliteName": "SAT_3"
+        }
+      ],
+      "fuel": -1
+    },
+    {
+      "name": "PLANET_ef9f",
+      "distances": [
+        {
+          "Distance": 5,
+          "SatelliteName": "SAT_0"
+        },
+        {
+          "Distance": 15,
+          "SatelliteName": "SAT_2"
+        },
+        {
+          "Distance": 15,
+          "SatelliteName": "SAT_3"
+        },
+        {
+          "Distance": 5,
+          "SatelliteName": "SAT_1"
+        }
+      ],
+      "fuel": 20000
+    },
+    {
+      "name": "PLANET_47d0",
+      "distances": [
+        {
+          "Distance": 8,
+          "SatelliteName": "SAT_0"
+        },
+        {
+          "Distance": 12,
+          "SatelliteName": "SAT_2"
+        },
+        {
+          "Distance": 8,
+          "SatelliteName": "SAT_1"
+        },
+        {
+          "Distance": 12,
+          "SatelliteName": "SAT_3"
+        }
+      ],
+      "fuel": 12000
+    },
+    {
+      "name": "PLANET_937a",
+      "distances": [
         {
           "Distance": 8,
           "SatelliteName": "SAT_3"
         },
         {
-          "Distance": 10,
+          "Distance": 8,
           "SatelliteName": "SAT_2"
+        },
+        {
+          "Distance": 12,
+          "SatelliteName": "SAT_0"
+        },
+        {
+          "Distance": 12,
+          "SatelliteName": "SAT_1"
+        }
+      ],
+      "fuel": 1000
+    },
+    {
+      "name": "ASTEROID_2b42",
+      "distances": [
+        {
+          "Distance": 16,
+          "SatelliteName": "SAT_2"
+        },
+        {
+          "Distance": 14,
+          "SatelliteName": "SAT_3"
+        },
+        {
+          "Distance": 4,
+          "SatelliteName": "SAT_1"
+        },
+        {
+          "Distance": 6,
+          "SatelliteName": "SAT_0"
         }
       ],
       "fuel": -1
     },
     {
-      "name": "PLANET_8912",
+      "name": "ASTEROID_1e0c",
       "distances": [
         {
-          "Distance": 5,
+          "Distance": 11,
           "SatelliteName": "SAT_3"
         },
         {
           "Distance": 7,
+          "SatelliteName": "SAT_1"
+        },
+        {
+          "Distance": 13,
           "SatelliteName": "SAT_2"
         },
         {
-          "Distance": 7,
+          "Distance": 9,
           "SatelliteName": "SAT_0"
-        },
-        {
-          "Distance": 5,
-          "SatelliteName": "SAT_1"
         }
       ],
-      "fuel": 10000
+      "fuel": -1
     },
     {
-      "name": "WALDO_2ad4",
+      "name": "ASTEROID_293a",
       "distances": [
-        {
-          "Distance": 1,
-          "SatelliteName": "SAT_1"
-        },
         {
           "Distance": 7,
           "SatelliteName": "SAT_3"
+        },
+        {
+          "Distance": 13,
+          "SatelliteName": "SAT_0"
         },
         {
           "Distance": 11,
-          "SatelliteName": "SAT_2"
-        },
-        {
-          "Distance": 5,
-          "SatelliteName": "SAT_0"
-        }
-      ],
-      "fuel": -1
-    },
-    {
-      "name": "PLANET_5afa",
-      "distances": [
-        {
-          "Distance": 6,
-          "SatelliteName": "SAT_3"
-        },
-        {
-          "Distance": 6,
-          "SatelliteName": "SAT_0"
-        },
-        {
-          "Distance": 10,
-          "SatelliteName": "SAT_2"
-        },
-        {
-          "Distance": 2,
           "SatelliteName": "SAT_1"
-        }
-      ],
-      "fuel": 10000
-    },
-    {
-      "name": "SPEED_9cec",
-      "distances": [
-        {
-          "Distance": 5,
-          "SatelliteName": "SAT_3"
         },
         {
           "Distance": 9,
           "SatelliteName": "SAT_2"
-        },
-        {
-          "Distance": 7,
-          "SatelliteName": "SAT_0"
-        },
-        {
-          "Distance": 3,
-          "SatelliteName": "SAT_1"
         }
       ],
       "fuel": -1
-    },
-    {
-      "name": "PLANET_b411",
-      "distances": [
-        {
-          "Distance": 6,
-          "SatelliteName": "SAT_1"
-        },
-        {
-          "Distance": 10,
-          "SatelliteName": "SAT_0"
-        },
-        {
-          "Distance": 2,
-          "SatelliteName": "SAT_3"
-        },
-        {
-          "Distance": 6,
-          "SatelliteName": "SAT_2"
-        }
-      ],
-      "fuel": 10000
     }
   ]
 }
