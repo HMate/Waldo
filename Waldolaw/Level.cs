@@ -161,6 +161,7 @@ namespace Waldolaw
                 foreach (var cell in row)
                 {
                     cell.StepDistance = -1;
+                    cell.Steps = new();
                     cell.LastStepDirection = Direction.None;
                     cell.FirstStepDirection = Direction.None;
                 }
@@ -177,5 +178,6 @@ namespace Waldolaw
         public int StepDistance = -1;
         public Direction FirstStepDirection = Direction.None;
         public Direction LastStepDirection = Direction.None;
+        public List<Direction> Steps = new();
     }
 }

@@ -85,9 +85,27 @@ namespace Waldolaw
             return new Pos(self.X + other.X, self.Y + other.Y);
         }
 
+        public static Pos operator +(Pos self, Direction dir)
+        {
+            return dir switch
+            {
+                Direction.Top => new Pos(self.X, self.Y - 1),
+                Direction.Right => new Pos(self.X + 1, self.Y),
+                Direction.Bottom => new Pos(self.X, self.Y + 1),
+                Direction.Left => new Pos(self.X - 1, self.Y),
+                _ => new Pos(self.X, self.Y),
+            };
+        }
+
         public static Pos operator -(Pos self, Pos other)
         {
             return new Pos(self.X - other.X, self.Y - other.Y);
+        }
+
+        public int getDiff(Pos other)
+        {
+            Pos diff = (this - other);
+            return Math.Abs(diff.X) + Math.Abs(diff.Y);
         }
     }
 

@@ -9,9 +9,11 @@ namespace Waldolaw
     public record Path
     {
         public List<Item> Nodes { get; internal set; }
+        public List<Direction> StepsList { get; internal set; }
         public Item Last { get; private set; }
         public Direction Facing { get; private set; }
         public int Steps { get; internal set; }
+        public int StepsAtWaldo { get; internal set; }
         public bool HasWaldo { get; internal set; }
         public int FuelCost { get; internal set; } = 0;
         public int FuelAvailable { get; internal set; }
@@ -24,6 +26,22 @@ namespace Waldolaw
             Nodes = new List<Item>() { last };
             Last = last;
             Steps = steps;
+            StepsList = new List<Direction>();
+            Facing = facing;
+            FuelAvailable = fuelAvailable;
+            Speed = speed;
+            if (last.Type == ItemType.Waldo)
+            {
+                HasWaldo = true;
+            }
+        }
+
+        public Path(Item last, int steps, int fuelAvailable, int speed, Direction facing, List<Direction> stepsList)
+        {
+            Nodes = new List<Item>() { last };
+            Last = last;
+            Steps = steps;
+            StepsList = stepsList;
             Facing = facing;
             FuelAvailable = fuelAvailable;
             Speed = speed;
@@ -43,6 +61,26 @@ namespace Waldolaw
                 Last = last,
                 Steps = Steps + additionalSteps,
                 Facing = endFacing,
+                FuelCost = FuelCost + Simulator.CalcFuelCost(additionalSteps, Speed),
+                FuelAvailable = FuelAvailable + FuelLastFound, // TODO: Consider max tankable fuel ...
+                FuelLastFound = fuelHere,
+                Speed = (last.Type == ItemType.Turbo) ? (Speed + 1) : Speed,
+            };
+            return result;
+        }
+
+        public Path Extend(Item last, int additionalSteps, List<Direction> steps)
+        {
+            int fuelHere = (last.Type == ItemType.Planet) ? last.Fuel : 0;
+            Path result = this with
+            {
+                Nodes = new List<Item>(Nodes).Append(last).ToList(),
+                HasWaldo = HasWaldo || last.Type == ItemType.Waldo,
+                Last = last,
+                Steps = Steps + additionalSteps,
+                StepsAtWaldo = last.Type == ItemType.Waldo ? Steps + additionalSteps : StepsAtWaldo,
+                StepsList = StepsList.Concat(steps).ToList(),
+                Facing = steps.Last(),
                 FuelCost = FuelCost + Simulator.CalcFuelCost(additionalSteps, Speed),
                 FuelAvailable = FuelAvailable + FuelLastFound, // TODO: Consider max tankable fuel ...
                 FuelLastFound = fuelHere,
