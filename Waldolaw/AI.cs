@@ -27,10 +27,12 @@ namespace Waldolaw
             foreach (var path in completePaths)
             {
                 pathIndex++;
-                if (_timer.TimeMs() > 3950)
+#if !(DEBUG)
+                if (_timer.TimeMs() > 3850)
                 {
                     break;
                 }
+#endif
                 _logger.Debug($"Simulating path #{pathIndex} {path}");
                 currentGame = _game.Copy();
                 Simulator sim = new(currentGame);
@@ -99,10 +101,14 @@ namespace Waldolaw
 
             List<Path> completePaths = new();
             SortedList<int, Path> pathQueue = new(new DuplicateKeyComparer<int>()) {
-                { 0, new Path(game.Base, 0, game.Ship.Fuel, game.Ship.Speed, Direction.Top, new()) }
+                { 0, new Path(game.Base, 0, game.Ship.Fuel, game.MaxFuel, game.Ship.Speed, game.MaxSpeed, Direction.Top, new()) }
             };
-            const long timeout = 2000;
-            const long lastCallTimeout = 3400;
+#if DEBUG
+            const long timeout = 4000;
+#else
+            const long timeout = 3000;
+#endif
+            const long lastCallTimeout = 3700;
             while (pathQueue.Count > 0 &&
                 ((completePaths.Count > 0 && _timer.TimeMs() < timeout) || (completePaths.Count == 0)))
             {
@@ -112,13 +118,19 @@ namespace Waldolaw
                 var others = distances.OrderedSteps[prevPath.Last.Position];
                 foreach (TargetStepsStore.Entry target in others)
                 {
-                    if ((prevPath.Contains(target.Pos) && !prevPath.StillWorthVisit(target.Pos)) ||
-                        target.Steps.Count == 0)
+                    if (target.Steps.Count == 0 || // Steps.Count==0 means we dont have path to that target from this pos.
+                       (!prevPath.HasWaldo && target.Pos == game.Base.Position))
                     {
                         continue;
                     }
                     var stepsToTarget = target.Steps;
-                    int addedSteps = prevPath.Facing.CostTo(stepsToTarget.First()) + stepsToTarget.Count;
+                    Direction lastDir = prevPath.Facing;
+                    int addedSteps = 0; //prevPath.Facing.CostTo(stepsToTarget.First()) + stepsToTarget.Count;
+                    for (int i = 0; i < stepsToTarget.Count; i++)
+                    {
+                        addedSteps += 1 + lastDir.CostTo(stepsToTarget[i]);
+                        lastDir = stepsToTarget[i];
+                    }
                     Path path = prevPath.Extend(game.Level.ItemAt(target.Pos)!, addedSteps, stepsToTarget);
 
                     if (path.IsValid())
@@ -132,104 +144,33 @@ namespace Waldolaw
                         }
 
                         int heuristic = path.Steps + remainingHeuristic;
-                        pathQueue.Add(heuristic, path);
                         if (path.IsComplete())
                         {
+#if DEBUG
                             _logger.Info($"Complete path: {path}, H: {heuristic}");
+#endif
                             completePaths.Add(path);
                         }
                         else
                         {
-                            //_logger.Info($"Valid path: {path}, H: {heuristic}");
-                        }
-                        if (_timer.TimeMs() > lastCallTimeout)
-                        {
-                            _logger.Error($"Failed to calc path before timeout. Took {_timer.TimeMs()} ms");
-                            completePaths.Add(path);
-                            return completePaths;
-                        }
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-
-            }
-            return completePaths;
-        }
-
-        private List<Path> OldCalculatePathToTargets(Game game)
-        {
-            /**
-            - Run A* on targets.
-            - early stop criterions:
-                - If path does not contain enough fuel, we can discard it. So only keep and build on paths with enough fuel
-                - Order target distances by stepcount, so once we reach target out of reach, we can prune further targets on that path.
-                - Base becomes viable target on a path only after Waldo is reached.
-                - Once an iteration is complete, and we have a valid path, stop.
-            - If there are multiple valid paths in an iteration, lower step count wins.
-             */
-
-            List<Pos> possibleTargets = game.Items.Where(IsTarget)
-                .Select(it => it.Position)
-                .ToList();
-
-            var distances = CalculateTargetDistances(game, possibleTargets);
-            int waldoToBaseHeuristic = distances.DistancesTable[game.Waldo.Position][game.Base.Position].steps;
-
-            List<Path> completePaths = new();
-            SortedList<int, Path> pathQueue = new(new DuplicateKeyComparer<int>()) {
-                { 0, new Path(game.Base, 0, game.Ship.Fuel, game.Ship.Speed, Direction.Top) }
-            };
-            const long timeout = 2000;
-            const long lastCallTimeout = 3400;
-            while (pathQueue.Count > 0 &&
-                ((completePaths.Count > 0 && _timer.TimeMs() < timeout) || (completePaths.Count == 0)))
-            {
-                Path prevPath = pathQueue.GetValueAtIndex(0);
-                pathQueue.RemoveAt(0);
-
-                var others = distances.OrderedDistances[prevPath.Last.Position];
-                foreach (var node in others)
-                {
-                    if (prevPath.Contains(node.pos) && !prevPath.StillWorthVisit(node.pos))
-                    {
-                        continue;
-                    }
-                    int addedSteps = prevPath.Facing.CostTo(node.startFacing) + node.steps;
-                    Path path = prevPath.Extend(game.Level.ItemAt(node.pos)!, addedSteps, node.endFacing);
-
-                    if (path.IsValid())
-                    {
-                        int remainingHeuristic = 0;
-                        if (path.Last.Position != game.Base.Position)
-                        {
-                            remainingHeuristic = (path.HasWaldo) ?
-                                distances.DistancesTable[path.Last.Position][game.Base.Position].steps
-                                : distances.DistancesTable[path.Last.Position][game.Waldo.Position].steps + waldoToBaseHeuristic;
-                        }
-
-                        int heuristic = path.Steps + remainingHeuristic;
-                        pathQueue.Add(heuristic, path);
-                        if (path.IsComplete())
-                        {
-                            _logger.Info($"Complete path: {path}, H: {heuristic}");
-                            completePaths.Add(path);
-                        }
-                        else
-                        {
+                            pathQueue.Add(heuristic, path);
+#if DEBUG
                             _logger.Info($"Valid path: {path}, H: {heuristic}");
+#endif
                         }
+#if !(DEBUG)
                         if (_timer.TimeMs() > lastCallTimeout)
                         {
                             _logger.Error($"Failed to calc path before timeout. Took {_timer.TimeMs()} ms");
                             completePaths.Add(path);
                             return completePaths;
                         }
+#endif
                     }
                     else
                     {
+                        // Targest are oreder by distance. Non Valid is outside fuel range,
+                        // so next targets are outside range too, so we can skip them
                         break;
                     }
                 }
@@ -337,67 +278,6 @@ namespace Waldolaw
             return result;
         }
 
-        private void SimulateStepsToTargets(Simulator sim, Path path, Game currentGame, Level level, Item ship)
-        {
-            List<Item> targets = path.Nodes.Skip(1).ToList(); // First is Base itself
-            foreach (Item target in targets)
-            {
-#if DEBUG
-                _logger.Debug($"Going to target {target.Name} at {target.Position}");
-#endif
-                level.ClearGridDistances();
-                CalcStepDistancesToTarget(currentGame.Level, target.Position);
-                level.PrintLevel(ship);
-                level.PrintStepDistances();
-
-                int deb = 7;
-                while (ship.Position != target.Position)
-                {
-                    DoNextStep(sim, level, ship);
-                    level.PrintLevel(ship);
-                }
-            }
-        }
-
-        private void DoNextStep(Simulator sim, Level level, Item ship)
-        {
-            var posItems = level.GetGridCell(ship.Position).Items;
-            if (posItems.Count > 1 && posItems[0].Type == ItemType.Planet && !_didDock)
-            {
-                sim.DoCommandDock(500); // Do minimal, calc actual values later once we know the route
-                _didDock = true;
-                return;
-            }
-
-            List<(Pos, Direction)> nbs = level.GetNeighbours(ship.Position);
-            (int cost, Pos pos, Direction dir) target = (1000000, ship.Position, ship.Direction);
-            foreach ((Pos nb, Direction dir) in nbs)
-            {
-                var cell = level.GetGridCell(nb);
-                if (cell.StepDistance < 0)
-                {
-                    continue;
-                }
-                int manhattanCost = cell.StepDistance + cell.LastStepDirection.Reverse().CostTo(dir);
-                int stepCost = manhattanCost + 1 + ship.Direction.CostTo(dir);
-#if DEBUG
-                _logger.Debug($"Step cost to {dir} is {stepCost}");
-#endif
-                if (stepCost < target.cost)
-                {
-                    target = (stepCost, nb, dir);
-                }
-            }
-
-            if (target.dir != ship.Direction)
-            {
-                sim.DoCommandTurn(target.dir);
-            }
-
-            _didDock = false;
-            sim.DoCommandForward(target.pos);
-        }
-
         private void SimulateStepsFromPath(Simulator sim, Path path, Level level, Item ship)
         {
             foreach (Direction targetDirection in path.StepsList)
@@ -478,7 +358,7 @@ namespace Waldolaw
         private bool AllocateFuelAmongDocks(Simulator sim, Game game, Item ship)
         {
             int accountedFuel = 0;
-            _logger.Warn($"Ship fuel deficit: {ship.Fuel}");
+
             if (ship.Fuel < 0)
             {
                 List<Simulator.SimulatedCommandDock> docks = sim.GetDockCommands();
@@ -488,7 +368,6 @@ namespace Waldolaw
                     // Lets set every dock to 0 for cleaner calculation
                     stop.Undo();
                 }
-                _logger.Warn($"Ship fuel deficit after dock resets: {ship.Fuel}");
 
                 int index = 0;
                 while (ship.Fuel < 0)
@@ -544,7 +423,6 @@ namespace Waldolaw
                     dock.PostAlterDuration(500); // Have to do minimum duration rest of stops
                 }
             }
-            _logger.Warn($"Accounted fuel: {accountedFuel}, ship fuel: {ship.Fuel}");
             return true;
         }
 

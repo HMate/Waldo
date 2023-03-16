@@ -10,68 +10,61 @@ namespace Waldolaw
     {
         public List<Item> Nodes { get; internal set; }
         public List<Direction> StepsList { get; internal set; }
+        public List<Pos> Visited { get; internal set; } = new();
         public Item Last { get; private set; }
         public Direction Facing { get; private set; }
+        public int ShipFuelCurrently { get; private set; }
         public int Steps { get; internal set; }
         public int StepsAtWaldo { get; internal set; }
         public bool HasWaldo { get; internal set; }
-        public int FuelCost { get; internal set; } = 0;
-        public int FuelAvailable { get; internal set; }
+        public int TotalFuelSpent { get; internal set; } = 0;
+        public int TotalFuelTanked { get; internal set; }
         public int FuelLastFound { get; internal set; } = 0;
         public int Speed { get; internal set; }
+        public int FuelSpent { get; private set; } = 0;
 
+        private Dictionary<Pos, int> _FuelTanked = new();
+        private readonly int _MaxShipFuel;
+        private readonly int _MaxShipSpeed;
+        private Path? _Parent = null;
 
-        public Path(Item last, int steps, int fuelAvailable, int speed, Direction facing)
-        {
-            Nodes = new List<Item>() { last };
-            Last = last;
-            Steps = steps;
-            StepsList = new List<Direction>();
-            Facing = facing;
-            FuelAvailable = fuelAvailable;
-            Speed = speed;
-            if (last.Type == ItemType.Waldo)
-            {
-                HasWaldo = true;
-            }
-        }
-
-        public Path(Item last, int steps, int fuelAvailable, int speed, Direction facing, List<Direction> stepsList)
+        public Path(Item last, int steps, int fuelAvailable, int maxFuel, int speed, int maxSpeed, Direction facing, List<Direction> stepsList)
         {
             Nodes = new List<Item>() { last };
             Last = last;
             Steps = steps;
             StepsList = stepsList;
             Facing = facing;
-            FuelAvailable = fuelAvailable;
+            ShipFuelCurrently = fuelAvailable;
+            TotalFuelTanked = fuelAvailable;
             Speed = speed;
+            _MaxShipFuel = maxFuel;
+            _MaxShipSpeed = maxSpeed;
             if (last.Type == ItemType.Waldo)
             {
                 HasWaldo = true;
             }
         }
 
-        public Path Extend(Item last, int additionalSteps, Direction endFacing)
-        {
-            int fuelHere = (last.Type == ItemType.Planet) ? last.Fuel : 0;
-            Path result = this with
-            {
-                Nodes = new List<Item>(Nodes).Append(last).ToList(),
-                HasWaldo = HasWaldo || last.Type == ItemType.Waldo,
-                Last = last,
-                Steps = Steps + additionalSteps,
-                Facing = endFacing,
-                FuelCost = FuelCost + Simulator.CalcFuelCost(additionalSteps, Speed),
-                FuelAvailable = FuelAvailable + FuelLastFound, // TODO: Consider max tankable fuel ...
-                FuelLastFound = fuelHere,
-                Speed = (last.Type == ItemType.Turbo) ? (Speed + 1) : Speed,
-            };
-            return result;
-        }
-
         public Path Extend(Item last, int additionalSteps, List<Direction> steps)
         {
-            int fuelHere = (last.Type == ItemType.Planet) ? last.Fuel : 0;
+            bool isPlanet = (last.Type == ItemType.Planet);
+            bool isTurbo = (last.Type == ItemType.Turbo);
+            int fuelTankedHere = 0;
+            int fuelSpentThisMove = Simulator.CalcFuelCost(additionalSteps, Speed);
+            int planetFuelTanked = FuelTankedInPreviousStops(last);
+            if (isPlanet)
+            {
+                int fuelHere = last.Fuel - planetFuelTanked;
+                fuelTankedHere = Math.Max(0, Math.Min(fuelHere, _MaxShipFuel - ShipFuelCurrently - FuelLastFound + fuelSpentThisMove));
+                planetFuelTanked += fuelTankedHere;
+            }
+            var visited = Visited;
+            if (isTurbo)
+            {
+                visited = Visited.Append(last.Position).ToList();
+            }
+
             Path result = this with
             {
                 Nodes = new List<Item>(Nodes).Append(last).ToList(),
@@ -81,18 +74,31 @@ namespace Waldolaw
                 StepsAtWaldo = last.Type == ItemType.Waldo ? Steps + additionalSteps : StepsAtWaldo,
                 StepsList = StepsList.Concat(steps).ToList(),
                 Facing = steps.Last(),
-                FuelCost = FuelCost + Simulator.CalcFuelCost(additionalSteps, Speed),
-                FuelAvailable = FuelAvailable + FuelLastFound, // TODO: Consider max tankable fuel ...
-                FuelLastFound = fuelHere,
-                Speed = (last.Type == ItemType.Turbo) ? (Speed + 1) : Speed,
+                TotalFuelSpent = TotalFuelSpent + fuelSpentThisMove,
+                TotalFuelTanked = TotalFuelTanked + FuelLastFound,
+                FuelSpent = fuelSpentThisMove,
+                ShipFuelCurrently = Math.Min(ShipFuelCurrently + FuelLastFound, _MaxShipFuel) - fuelSpentThisMove,
+                FuelLastFound = fuelTankedHere,
+                Speed = (isTurbo && !Visited.Contains(last.Position)) ? Math.Min(Speed + 1, _MaxShipSpeed) : Speed,
+                Visited = visited,
+                _FuelTanked = new Dictionary<Pos, int>(_FuelTanked),
+                _Parent = this
             };
+            if (isPlanet)
+                result._FuelTanked[last.Position] = planetFuelTanked;
             return result;
+        }
+
+        private int FuelTankedInPreviousStops(Item target)
+        {
+            _FuelTanked.TryGetValue(target.Position, out int tanked);
+            return tanked;
         }
 
         public override string ToString()
         {
             string planets = string.Join(" - ", Nodes.Select(x => $"{x.Name}({x.Position.X},{x.Position.Y})"));
-            return $"{planets} | FΔ={FuelAvailable - FuelCost}, F+={FuelLastFound}, S={Steps}";
+            return $"{planets} | FΔ={TotalFuelTanked - TotalFuelSpent}, F={ShipFuelCurrently}, S={Steps}";
         }
 
         public bool Contains(Pos pos)
@@ -105,7 +111,7 @@ namespace Waldolaw
         /// </summary>
         internal bool IsValid()
         {
-            return FuelCost <= FuelAvailable;
+            return ShipFuelCurrently >= 0 && (ShipFuelCurrently + FuelLastFound <= _MaxShipFuel);
         }
 
         /// <summary>
@@ -114,23 +120,6 @@ namespace Waldolaw
         internal bool IsComplete()
         {
             return Last.Type == ItemType.Base && HasWaldo && IsValid();
-        }
-
-        /// <summary>
-        /// Target still worth visiting if it is Base or has fuel left on it.
-        /// </summary>
-        /// <param name="pos"></param>
-        /// <returns></returns>
-        /// <exception cref="NotImplementedException"></exception>
-        internal bool StillWorthVisit(Pos target)
-        {
-            // TODO: consider max fuel tank size while building path.
-            Item? visited = Nodes.Find(n => n.Position == target);
-            if (visited == null)
-                return true;
-            if (visited.Type == ItemType.Base)
-                return true;
-            return false;
         }
     }
 }
