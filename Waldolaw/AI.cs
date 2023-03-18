@@ -1,5 +1,6 @@
 ﻿using C5;
 using NLog;
+using System.IO;
 
 namespace Waldolaw
 {
@@ -60,6 +61,9 @@ namespace Waldolaw
                 {
                     (Commands commands, float timeCost) = sim.GenerateCommands();
                     float score = commands.Count + timeCost;
+#if DEBUG
+                    _logger.Info($"Path #{pathIndex} has score {score}={commands.Count}+{timeCost}. {path}");
+#endif
                     if (score < bestScore)
                     {
                         bestCommands = commands;
@@ -67,12 +71,6 @@ namespace Waldolaw
                         bestIndex = pathIndex;
 #if DEBUG
                         _logger.Info($"Path #{pathIndex} has score {score}={commands.Count}+{timeCost}. New best score. {path}");
-#endif
-                    }
-                    else
-                    {
-#if DEBUG
-                        _logger.Info($"Path #{pathIndex} has score {score}={commands.Count}+{timeCost}. {path}");
 #endif
                     }
                 }
@@ -113,10 +111,11 @@ namespace Waldolaw
             IPriorityQueue<Prio<Path>> pathQueue = new IntervalHeap<Prio<Path>>() {
                 new Prio<Path>(0,new Path(game.Base, 0, game.Ship.Fuel, game.MaxFuel, game.Ship.Speed, game.MaxSpeed, Direction.Top, new()))
             };
+
 #if DEBUG
             long timeout = 4000;
 #else
-            const long timeout = 2000;
+            const long timeout = 3000;
 #endif
 #if DEBUG
             long lastCallTimeout = 4700;
@@ -126,10 +125,14 @@ namespace Waldolaw
             while (pathQueue.Count > 0 &&
                 ((completePaths.Count > 0 && _timer.TimeMs() < timeout) || (completePaths.Count == 0)))
             {
-                Path prevPath = pathQueue.FindMin().Data;
+                var current = pathQueue.FindMin();
+#if DEBUG
+                _logger.Info($"Checking candidate H: {current.Priority}");
+#endif
+                Path prevPath = current.Data;
                 pathQueue.DeleteMin();
 
-                var others = distances.OrderedSteps[prevPath.Last.Position];
+                var others = distances.OrderedSteps[(prevPath.Last.Position, prevPath.Facing)];
                 foreach (TargetStepsStore.Entry target in others)
                 {
                     if (!prevPath.HasWaldo && target.Pos == game.Base.Position)
@@ -143,12 +146,18 @@ namespace Waldolaw
                     var stepsToTarget = target.Steps;
                     Direction lastDir = prevPath.Facing;
                     int addedSteps = 0;
+                    int commandCount = 0;
                     for (int i = 0; i < stepsToTarget.Count; i++)
                     {
-                        addedSteps += 1 + lastDir.CostTo(stepsToTarget[i]);
+                        int turns = lastDir.CostTo(stepsToTarget[i]);
+                        if (turns != 0)
+                        {
+                            commandCount += turns + 1;
+                        }
+                        addedSteps += 1 + turns;
                         lastDir = stepsToTarget[i];
                     }
-                    Path path = prevPath.Extend(game.Level.ItemAt(target.Pos)!, addedSteps, stepsToTarget);
+                    Path path = prevPath.Extend(game.Level.ItemAt(target.Pos)!, addedSteps, stepsToTarget, commandCount);
 
                     if (path.IsValid())
                     {
@@ -160,7 +169,7 @@ namespace Waldolaw
                                 : waldoDistances.DistancesTable[path.Last.Position][game.Waldo.Position].steps + waldoToBaseHeuristic;
                         }
 
-                        int heuristic = path.Steps + remainingHeuristic;
+                        double heuristic = path.StepsValue + Simulator.CalcValue((remainingHeuristic * 0.2), remainingHeuristic, path.Speed);
                         if (path.IsComplete())
                         {
 #if DEBUG
@@ -196,29 +205,12 @@ namespace Waldolaw
             return completePaths;
         }
 
-        public class DuplicateKeyComparer<TKey> : IComparer<TKey> where TKey : IComparable
-        {
-            public int Compare(TKey? x, TKey? y)
-            {
-                if (x == null || y == null)
-                {
-                    return 0;
-                }
-                int result = x.CompareTo(y);
-
-                if (result == 0)
-                    return 1; // Handle equality as being greater. Note: this will break Remove(key) or
-                else          // IndexOfKey(key) since the comparer never returns 0 to signal key equality
-                    return result;
-            }
-        }
-
         internal struct Prio<D> : IComparable<Prio<D>> where D : class
         {
             public D Data { get; }
-            public int Priority { get; }
+            public double Priority { get; }
 
-            public Prio(int priority, D data)
+            public Prio(double priority, D data)
             {
                 Data = data;
                 Priority = priority;
@@ -231,6 +223,7 @@ namespace Waldolaw
 
             public bool Equals(Prio<D> that)
             {
+                // float ==, but okay because here we use it almost as a hash
                 return Priority == that.Priority;
             }
 
@@ -259,7 +252,7 @@ namespace Waldolaw
         class TargetStepsStore
         {
             public record struct Entry(Pos Pos, List<Direction> Steps);
-            public Dictionary<Pos, List<Entry>> OrderedSteps = new();
+            public Dictionary<(Pos, Direction), List<Entry>> OrderedSteps = new();
         }
 
         /// <summary>
@@ -280,7 +273,8 @@ namespace Waldolaw
                 CalcStrictStepDistancesFromTarget(level, target);
                 //level.PrintStepDistances();
 
-                result.OrderedSteps[target] = new();
+                foreach (var direction in DirectionExtensions.MAIN_DIRECTIONS)
+                    result.OrderedSteps[(target, direction)] = new();
                 foreach (Pos otherTarget in possibleTargets)
                 {
                     if (target == otherTarget) continue;
@@ -288,12 +282,49 @@ namespace Waldolaw
                     foreach (var direction in DirectionExtensions.MAIN_DIRECTIONS)
                     {
                         var entry = new TargetStepsStore.Entry(otherTarget, cell.Steps[direction]);
-                        result.OrderedSteps[target].Add(entry);
+                        result.OrderedSteps[(target, direction)].Add(entry);
                     }
                 }
-                result.OrderedSteps[target] = result.OrderedSteps[target].OrderBy(x => x.Steps.Count).ToList();
+                foreach (var direction in DirectionExtensions.MAIN_DIRECTIONS)
+                {
+                    result.OrderedSteps[(target, direction)] =
+                        result.OrderedSteps[(target, direction)].OrderBy(x => x.Steps.Count).ToList();
+                }
             }
             return result;
+        }
+
+        private void CalcStrictStepDistancesFromTarget(Level<DetailedCell> level, Pos target)
+        {
+            Queue<(Pos next, Direction dir, int stepDist)> nextCells = new();
+
+            foreach (Direction direction in DirectionExtensions.MAIN_DIRECTIONS)
+            {
+                level.GetGridCell(target).StepDistanceForDir[direction] = 0;
+                nextCells.Enqueue((target, direction, 0));
+
+                while (nextCells.Any())
+                {
+                    (Pos pos, Direction dir, int currentDist) = nextCells.Dequeue();
+                    List<(Pos, Direction)> nbs = level.GetNeighbours(pos);
+                    DetailedCell curCell = level.GetGridCell(pos);
+                    foreach (var (nb, nbDir) in nbs)
+                    {
+                        DetailedCell nbCell = level.GetGridCell(nb);
+                        int stepDist = 1 + currentDist + dir.CostTo(nbDir);
+                        if (Simulator.IsPassable(level, nb) &&
+                            (nbCell.StepDistanceForDir[direction] < 0 || stepDist < nbCell.StepDistanceForDir[direction]))
+                        {
+                            nbCell.StepDistanceForDir[direction] = stepDist;
+                            nbCell.Steps[direction] = curCell.Steps[direction].Append(nbDir).ToList();
+                            if (nbCell.Items.Count == 0 || !IsTarget(nbCell.Items[0]))
+                            {
+                                nextCells.Enqueue((nb, nbDir, stepDist));
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -328,60 +359,6 @@ namespace Waldolaw
             return result;
         }
 
-        private void SimulateStepsFromPath(Simulator sim, Path path, Level<Cell> level, Item ship)
-        {
-            foreach (Direction targetDirection in path.StepsList)
-            {
-                var posItems = level.GetGridCell(ship.Position).Items;
-                if (posItems.Count > 1 && posItems[0].Type == ItemType.Planet && !_didDock)
-                {
-                    sim.DoCommandDock(500); // TODO: Could do precise fuel calc here now.
-                    _didDock = true;
-                }
-
-                if (targetDirection != ship.Direction)
-                {
-                    sim.DoCommandTurn(targetDirection);
-                }
-
-                _didDock = false;
-                sim.DoCommandForward(ship.Position + targetDirection);
-            }
-        }
-
-        private void CalcStrictStepDistancesFromTarget(Level<DetailedCell> level, Pos target)
-        {
-            level.GetGridCell(target).StepDistance = 0;
-            Queue<(Pos next, Direction dir, int stepDist)> nextCells = new();
-
-            foreach (Direction direction in DirectionExtensions.MAIN_DIRECTIONS)
-            {
-                nextCells.Enqueue((target, direction, 0));
-
-                while (nextCells.Any())
-                {
-                    (Pos pos, Direction dir, int currentDist) = nextCells.Dequeue();
-                    List<(Pos, Direction)> nbs = level.GetNeighbours(pos);
-                    DetailedCell curCell = level.GetGridCell(pos);
-                    foreach (var (nb, nbDir) in nbs)
-                    {
-                        DetailedCell nbCell = level.GetGridCell(nb);
-                        int stepDist = 1 + currentDist + dir.CostTo(nbDir);
-                        if (Simulator.IsPassable(level, nb) &&
-                            (nbCell.StepDistance < 0 || stepDist < nbCell.StepDistance))
-                        {
-                            nbCell.StepDistance = stepDist;
-                            nbCell.Steps[direction] = curCell.Steps[direction].Append(nbDir).ToList();
-                            if (nbCell.Items.Count == 0 || !IsTarget(nbCell.Items[0]))
-                            {
-                                nextCells.Enqueue((nb, nbDir, stepDist));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
         private void CalcStepDistancesToTarget(Level<DetailedCell> level, Pos target)
         {
             level.GetGridCell(target).StepDistance = 0;
@@ -406,6 +383,27 @@ namespace Waldolaw
                         nextCells.Enqueue((nb, nbDir));
                     }
                 }
+            }
+        }
+
+        private void SimulateStepsFromPath(Simulator sim, Path path, Level<Cell> level, Item ship)
+        {
+            foreach (Direction targetDirection in path.StepsList)
+            {
+                var posItems = level.GetGridCell(ship.Position).Items;
+                if (posItems.Count > 1 && posItems[0].Type == ItemType.Planet && !_didDock)
+                {
+                    sim.DoCommandDock(500); // TODO: Could do precise fuel calc here now.
+                    _didDock = true;
+                }
+
+                if (targetDirection != ship.Direction)
+                {
+                    sim.DoCommandTurn(targetDirection);
+                }
+
+                _didDock = false;
+                sim.DoCommandForward(ship.Position + targetDirection);
             }
         }
 

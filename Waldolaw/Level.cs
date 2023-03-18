@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.Diagnostics;
 using NLog;
+using System.Text;
 
 namespace Waldolaw
 {
@@ -19,6 +20,12 @@ namespace Waldolaw
         public int StepDistance = -1;
         public Direction FirstStepDirection = Direction.None;
         public Direction LastStepDirection = Direction.None;
+        public Dictionary<Direction, int> StepDistanceForDir = new() {
+            {Direction.Top, -1 } ,
+            {Direction.Right, -1 } ,
+            {Direction.Bottom, -1 } ,
+            {Direction.Left, -1 } ,
+        };
         public Dictionary<Direction, List<Direction>> Steps = new() {
             {Direction.Top, new () } ,
             {Direction.Right, new () } ,
@@ -34,7 +41,13 @@ namespace Waldolaw
                         {Direction.Right, new () } ,
                         {Direction.Bottom, new () } ,
                         {Direction.Left, new () } ,
-                    };
+            };
+            StepDistanceForDir = new() {
+                {Direction.Top, -1 } ,
+                {Direction.Right, -1 } ,
+                {Direction.Bottom, -1 } ,
+                {Direction.Left, -1 } ,
+            };
             LastStepDirection = Direction.None;
             FirstStepDirection = Direction.None;
         }

@@ -1,4 +1,6 @@
 ﻿
+using CommunityToolkit.Diagnostics;
+
 namespace Waldolaw
 {
     public enum Direction

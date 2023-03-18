@@ -1,4 +1,6 @@
 ﻿
+using C5;
+
 namespace Waldolaw
 {
     public record Path
@@ -10,6 +12,7 @@ namespace Waldolaw
         public Direction Facing { get; private set; }
         public int ShipFuelCurrently { get; private set; }
         public int Steps { get; internal set; }
+        public double StepsValue { get; private set; }
         public int StepsAtWaldo { get; internal set; }
         public bool HasWaldo { get; internal set; }
         public int TotalFuelSpent { get; internal set; } = 0;
@@ -28,6 +31,7 @@ namespace Waldolaw
             Nodes = new List<Item>() { last };
             Last = last;
             Steps = steps;
+            StepsValue = Simulator.CalcValue(0, steps, speed);
             StepsList = stepsList;
             Facing = facing;
             ShipFuelCurrently = fuelAvailable;
@@ -41,7 +45,7 @@ namespace Waldolaw
             }
         }
 
-        public Path Extend(Item last, int additionalSteps, List<Direction> steps)
+        public Path Extend(Item last, int additionalSteps, List<Direction> steps, int commandCount)
         {
             bool isPlanet = (last.Type == ItemType.Planet);
             bool isTurbo = (last.Type == ItemType.Turbo);
@@ -66,6 +70,7 @@ namespace Waldolaw
                 HasWaldo = HasWaldo || last.Type == ItemType.Waldo,
                 Last = last,
                 Steps = Steps + additionalSteps,
+                StepsValue = StepsValue + Simulator.CalcValue(commandCount + ((isPlanet) ? 1 : 0), additionalSteps, Speed),
                 StepsAtWaldo = last.Type == ItemType.Waldo ? Steps + additionalSteps : StepsAtWaldo,
                 StepsList = StepsList.Concat(steps).ToList(),
                 Facing = steps.Last(),

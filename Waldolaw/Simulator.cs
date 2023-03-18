@@ -42,9 +42,9 @@ namespace Waldolaw
             command.Do();
         }
 
-        public void UndoLastCommand()
+        public static double CalcValue(double commandCount, int steps, int speed)
         {
-
+            return commandCount + (CalcTimeCost(steps, speed) / 1000);
         }
 
         /// <summary>
