@@ -20,7 +20,7 @@ namespace Waldolaw
         public int StepDistance = -1;
         public Direction FirstStepDirection = Direction.None;
         public Direction LastStepDirection = Direction.None;
-        public Dictionary<Direction, int> StepDistanceForDir = new() {
+        public Dictionary<Direction, int> ValueForDir = new() {
             {Direction.Top, -1 } ,
             {Direction.Right, -1 } ,
             {Direction.Bottom, -1 } ,
@@ -42,7 +42,7 @@ namespace Waldolaw
                         {Direction.Bottom, new () } ,
                         {Direction.Left, new () } ,
             };
-            StepDistanceForDir = new() {
+            ValueForDir = new() {
                 {Direction.Top, -1 } ,
                 {Direction.Right, -1 } ,
                 {Direction.Bottom, -1 } ,
@@ -126,6 +126,11 @@ namespace Waldolaw
             StringBuilder message = new StringBuilder();
             for (int i = 0; i < _grid.Length; i++)
             {
+                if (i != 0 && i % (Size) == 0)
+                {
+                    _logger.Debug(message.ToString());
+                    message.Clear();
+                }
                 var cell = _grid[i];
                 if (cell.Items.Count == 0)
                 {
@@ -163,12 +168,8 @@ namespace Waldolaw
                         message.Append("B");
                     }
                 }
-                if (i != 0 && i % (Size - 1) == 0)
-                {
-                    _logger.Debug(message.ToString());
-                    message.Clear();
-                }
             }
+            _logger.Debug(message.ToString());
 #endif
         }
 

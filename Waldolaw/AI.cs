@@ -1,6 +1,7 @@
 ﻿using C5;
 using NLog;
 using System.IO;
+using System.Linq;
 
 namespace Waldolaw
 {
@@ -15,11 +16,11 @@ namespace Waldolaw
         public Commands? CalculatePathToWaldo()
         {
             _logger.Debug($"Waldo is at {_game.Waldo.Position}");
+            _logger.Debug($"Level size: {_game.Level.Size}");
 
             Game<DetailedCell> currentGame = _game.Copy<DetailedCell>();
 
             List<Path> completePaths = CalculatePathToTargets(currentGame);
-            _logger.Info($"Found {completePaths.Count} complete paths in {_timer.TimeMs()} ms");
 
             Commands? bestCommands = EvaluatePaths(completePaths);
             return bestCommands;
@@ -112,6 +113,7 @@ namespace Waldolaw
                 new Prio<Path>(0,new Path(game.Base, 0, game.Ship.Fuel, game.MaxFuel, game.Ship.Speed, game.MaxSpeed, Direction.Top, new()))
             };
 
+            int checkedPaths = 0;
 #if DEBUG
             long timeout = 4000;
 #else
@@ -154,6 +156,10 @@ namespace Waldolaw
                         {
                             commandCount += turns + 1;
                         }
+                        else if (commandCount == 0)
+                        {
+                            commandCount = 1;
+                        }
                         addedSteps += 1 + turns;
                         lastDir = stepsToTarget[i];
                     }
@@ -179,6 +185,7 @@ namespace Waldolaw
                         }
                         else
                         {
+                            checkedPaths++;
                             pathQueue.Add(new Prio<Path>(heuristic, path));
 #if DEBUG
                             _logger.Info($"Valid path: {path}, H: {heuristic}");
@@ -187,7 +194,7 @@ namespace Waldolaw
 #if !(DEBUG)
                         if (_timer.TimeMs() > lastCallTimeout)
                         {
-                            _logger.Error($"Failed to calc path before timeout. Took {_timer.TimeMs()} ms");
+                            _logger.Error($"Failed to calc path before timeout. Took {_timer.TimeMs()} ms, checked {checkedPaths} paths");
                             completePaths.Add(path);
                             return completePaths;
                         }
@@ -202,6 +209,7 @@ namespace Waldolaw
                 }
 
             }
+            _logger.Info($"Found {completePaths.Count}/{checkedPaths} complete paths in {_timer.TimeMs()} ms");
             return completePaths;
         }
 
@@ -251,7 +259,7 @@ namespace Waldolaw
 
         class TargetStepsStore
         {
-            public record struct Entry(Pos Pos, List<Direction> Steps);
+            public record struct Entry(Pos Pos, List<Direction> Steps, int Value);
             public Dictionary<(Pos, Direction), List<Entry>> OrderedSteps = new();
         }
 
@@ -264,11 +272,10 @@ namespace Waldolaw
             TargetStepsStore result = new();
 
             Level<DetailedCell> level = game.Level;
-            _logger.Debug($"calculating target distances for {possibleTargets.Count} targets");
+            _logger.Debug($"calculating strict target distances for {possibleTargets.Count} targets");
             level.PrintLevel(game.Waldo);
             foreach (Pos target in possibleTargets)
             {
-                _logger.Debug($"calculating target distances from {target}");
                 level.ClearGridDistances();
                 CalcStrictStepDistancesFromTarget(level, target);
                 //level.PrintStepDistances();
@@ -279,9 +286,10 @@ namespace Waldolaw
                 {
                     if (target == otherTarget) continue;
                     var cell = level.GetGridCell(otherTarget);
+                    int valueForPlanet = (cell.Items[0].Type == ItemType.Planet) ? 1 : 0;
                     foreach (var direction in DirectionExtensions.MAIN_DIRECTIONS)
                     {
-                        var entry = new TargetStepsStore.Entry(otherTarget, cell.Steps[direction]);
+                        var entry = new TargetStepsStore.Entry(otherTarget, cell.Steps[direction], cell.ValueForDir[direction] + valueForPlanet);
                         result.OrderedSteps[(target, direction)].Add(entry);
                     }
                 }
@@ -300,26 +308,31 @@ namespace Waldolaw
 
             foreach (Direction direction in DirectionExtensions.MAIN_DIRECTIONS)
             {
-                level.GetGridCell(target).StepDistanceForDir[direction] = 0;
-                nextCells.Enqueue((target, direction, 0));
+                level.GetGridCell(target).ValueForDir[direction] = 0;
+                nextCells.Enqueue((target, direction, 1));
 
                 while (nextCells.Any())
                 {
-                    (Pos pos, Direction dir, int currentDist) = nextCells.Dequeue();
+                    (Pos pos, Direction dir, int currentVal) = nextCells.Dequeue();
                     List<(Pos, Direction)> nbs = level.GetNeighbours(pos);
                     DetailedCell curCell = level.GetGridCell(pos);
                     foreach (var (nb, nbDir) in nbs)
                     {
                         DetailedCell nbCell = level.GetGridCell(nb);
-                        int stepDist = 1 + currentDist + dir.CostTo(nbDir);
-                        if (Simulator.IsPassable(level, nb) &&
-                            (nbCell.StepDistanceForDir[direction] < 0 || stepDist < nbCell.StepDistanceForDir[direction]))
+                        int stepVal = dir.CostTo(nbDir) + 1;
+                        if (stepVal == 1)
                         {
-                            nbCell.StepDistanceForDir[direction] = stepDist;
+                            stepVal = 0;
+                        }
+                        int pathVal = stepVal + currentVal;
+                        if (Simulator.IsPassable(level, nb) &&
+                            (nbCell.ValueForDir[direction] < 0 || pathVal < nbCell.ValueForDir[direction]))
+                        {
+                            nbCell.ValueForDir[direction] = pathVal;
                             nbCell.Steps[direction] = curCell.Steps[direction].Append(nbDir).ToList();
                             if (nbCell.Items.Count == 0 || !IsTarget(nbCell.Items[0]))
                             {
-                                nextCells.Enqueue((nb, nbDir, stepDist));
+                                nextCells.Enqueue((nb, nbDir, pathVal));
                             }
                         }
                     }
@@ -340,7 +353,6 @@ namespace Waldolaw
             level.PrintLevel(game.Waldo);
             foreach (Pos target in possibleTargets)
             {
-                _logger.Debug($"calculating target distances from {target}");
                 level.ClearGridDistances();
                 CalcStepDistancesToTarget(level, target);
                 //level.PrintStepDistances();

@@ -36,10 +36,6 @@ namespace Waldolaw
                 }
                 GameBuilder builder = new();
                 Game<Cell> game = builder.Build(input);
-                foreach (var item in game.Items)
-                {
-                    logger.Info($"{item}");
-                }
 
                 Commands? commands = new AI(game, timer).CalculatePathToWaldo();
 
