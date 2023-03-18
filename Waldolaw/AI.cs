@@ -1,11 +1,12 @@
-﻿using NLog;
+﻿using C5;
+using NLog;
 using System.Diagnostics;
 
 namespace Waldolaw
 {
     public class AI
     {
-        public AI(Game game, Timer timer)
+        public AI(Game<Cell> game, Timer timer)
         {
             _game = game;
             _timer = timer;
@@ -15,7 +16,7 @@ namespace Waldolaw
         {
             _logger.Debug($"Waldo is at {_game.Waldo.Position}");
 
-            Game currentGame = _game.Copy();
+            Game<DetailedCell> currentGame = _game.Copy<DetailedCell>();
 
             List<Path> completePaths = CalculatePathToTargets(currentGame);
             _logger.Info($"Found {completePaths.Count} complete paths in {_timer.TimeMs()} ms");
@@ -40,9 +41,9 @@ namespace Waldolaw
                 }
 #endif
                 // _logger.Debug($"Simulating path #{pathIndex} {path}");
-                Game currentGame = _game.Copy();
+                Game<Cell> currentGame = _game.Copy<Cell>();
                 Simulator sim = new(currentGame);
-                Level level = currentGame.Level;
+                Level<Cell> level = currentGame.Level;
                 Item ship = currentGame.Ship;
 
                 SimulateStepsFromPath(sim, path, level, ship);
@@ -89,7 +90,7 @@ namespace Waldolaw
                     it.Type == ItemType.Turbo;
         }
 
-        private List<Path> CalculatePathToTargets(Game game)
+        private List<Path> CalculatePathToTargets(Game<DetailedCell> game)
         {
             /**
             - Run A* on targets.
@@ -110,13 +111,16 @@ namespace Waldolaw
             int waldoToBaseHeuristic = waldoDistances.DistancesTable[game.Waldo.Position][game.Base.Position].steps;
 
             List<Path> completePaths = new();
-            SortedList<int, Path> pathQueue = new(new DuplicateKeyComparer<int>()) {
-                { 0, new Path(game.Base, 0, game.Ship.Fuel, game.MaxFuel, game.Ship.Speed, game.MaxSpeed, Direction.Top, new()) }
+            //SortedList<int, Path> pathQueue = new(new DuplicateKeyComparer<int>()) {
+            //    { 0, new Path(game.Base, 0, game.Ship.Fuel, game.MaxFuel, game.Ship.Speed, game.MaxSpeed, Direction.Top, new()) }
+            //};
+            IPriorityQueue<Prio<Path>> pathQueue = new IntervalHeap<Prio<Path>>() {
+                new Prio<Path>(0,new Path(game.Base, 0, game.Ship.Fuel, game.MaxFuel, game.Ship.Speed, game.MaxSpeed, Direction.Top, new()))
             };
 #if DEBUG
             long timeout = 4000;
 #else
-            const long timeout = 3000;
+            const long timeout = 2000;
 #endif
 #if DEBUG
             long lastCallTimeout = 4700;
@@ -126,8 +130,10 @@ namespace Waldolaw
             while (pathQueue.Count > 0 &&
                 ((completePaths.Count > 0 && _timer.TimeMs() < timeout) || (completePaths.Count == 0)))
             {
-                Path prevPath = pathQueue.GetValueAtIndex(0);
-                pathQueue.RemoveAt(0);
+                //Path prevPath = pathQueue.GetValueAtIndex(0);
+                //pathQueue.RemoveAt(0);
+                Path prevPath = pathQueue.FindMin().Data;
+                pathQueue.DeleteMin();
 
                 var others = distances.OrderedSteps[prevPath.Last.Position];
                 foreach (TargetStepsStore.Entry target in others)
@@ -170,7 +176,7 @@ namespace Waldolaw
                         }
                         else
                         {
-                            pathQueue.Add(heuristic, path);
+                            pathQueue.Add(new Prio<Path>(heuristic, path));
 #if DEBUG
                             _logger.Info($"Valid path: {path}, H: {heuristic}");
 #endif
@@ -213,6 +219,43 @@ namespace Waldolaw
             }
         }
 
+        internal struct Prio<D> : IComparable<Prio<D>> where D : class
+        {
+            public D Data { get; }
+            public int Priority { get; }
+
+            public Prio(int priority, D data)
+            {
+                Data = data;
+                Priority = priority;
+            }
+
+            public int CompareTo(Prio<D> that)
+            {
+                return Priority.CompareTo(that.Priority);
+            }
+
+            public bool Equals(Prio<D> that)
+            {
+                return Priority == that.Priority;
+            }
+
+            public static Prio<D> operator +(Prio<D> tp, int delta)
+            {
+                return new Prio<D>(tp.Priority + delta, tp.Data);
+            }
+
+            public static Prio<D> operator -(Prio<D> tp, int delta)
+            {
+                return new Prio<D>(tp.Priority - delta, tp.Data);
+            }
+
+            public override string ToString()
+            {
+                return string.Format("{0}[{1}]", Data, Priority);
+            }
+        }
+
         class TargetDistancesStore
         {
             public record struct DistanceEntry(Pos pos, int steps, Direction startFacing, Direction endFacing);
@@ -229,11 +272,11 @@ namespace Waldolaw
         /// Calculate step counts from all possible targets to all other possible targets.
         /// First dict contains starting positions, inner list contains end positions and steps until that pos ordered by lowest steps first.
         /// </summary>
-        private TargetStepsStore CalculateStrictTargetDistances(Game game, List<Pos> possibleTargets)
+        private TargetStepsStore CalculateStrictTargetDistances(Game<DetailedCell> game, List<Pos> possibleTargets)
         {
             TargetStepsStore result = new();
 
-            Level level = game.Level;
+            Level<DetailedCell> level = game.Level;
             _logger.Debug($"calculating target distances for {possibleTargets.Count} targets");
             level.PrintLevel(game.Waldo);
             foreach (Pos target in possibleTargets)
@@ -263,11 +306,11 @@ namespace Waldolaw
         /// Calculate step counts from all possible targets to all other possible targets.
         /// First dict contains starting positions, inner list contains end positions and steps until that pos ordered by lowest steps first.
         /// </summary>
-        private TargetDistancesStore CalculateTargetDistances(Game game, List<Pos> possibleTargets)
+        private TargetDistancesStore CalculateTargetDistances(Game<DetailedCell> game, List<Pos> possibleTargets)
         {
             TargetDistancesStore result = new();
 
-            Level level = game.Level;
+            Level<DetailedCell> level = game.Level;
             _logger.Debug($"calculating target distances for {possibleTargets.Count} targets");
             level.PrintLevel(game.Waldo);
             foreach (Pos target in possibleTargets)
@@ -291,7 +334,7 @@ namespace Waldolaw
             return result;
         }
 
-        private void SimulateStepsFromPath(Simulator sim, Path path, Level level, Item ship)
+        private void SimulateStepsFromPath(Simulator sim, Path path, Level<Cell> level, Item ship)
         {
             foreach (Direction targetDirection in path.StepsList)
             {
@@ -312,7 +355,7 @@ namespace Waldolaw
             }
         }
 
-        private void CalcStrictStepDistancesFromTarget(Level level, Pos target)
+        private void CalcStrictStepDistancesFromTarget(Level<DetailedCell> level, Pos target)
         {
             level.GetGridCell(target).StepDistance = 0;
             Queue<(Pos next, Direction dir, int stepDist)> nextCells = new();
@@ -325,10 +368,10 @@ namespace Waldolaw
                 {
                     (Pos pos, Direction dir, int currentDist) = nextCells.Dequeue();
                     List<(Pos, Direction)> nbs = level.GetNeighbours(pos);
-                    Cell curCell = level.GetGridCell(pos);
+                    DetailedCell curCell = level.GetGridCell(pos);
                     foreach (var (nb, nbDir) in nbs)
                     {
-                        Cell nbCell = level.GetGridCell(nb);
+                        DetailedCell nbCell = level.GetGridCell(nb);
                         int stepDist = 1 + currentDist + dir.CostTo(nbDir);
                         if (Simulator.IsPassable(level, nb) &&
                             (nbCell.StepDistance < 0 || stepDist < nbCell.StepDistance))
@@ -345,7 +388,7 @@ namespace Waldolaw
             }
         }
 
-        private void CalcStepDistancesToTarget(Level level, Pos target)
+        private void CalcStepDistancesToTarget(Level<DetailedCell> level, Pos target)
         {
             level.GetGridCell(target).StepDistance = 0;
             Queue<(Pos, Direction)> nextCells = new();
@@ -359,7 +402,7 @@ namespace Waldolaw
                 Direction firstDir = level.GetGridCell(pos).FirstStepDirection;
                 foreach (var (nb, nbDir) in nbs)
                 {
-                    Cell nbCell = level.GetGridCell(nb);
+                    DetailedCell nbCell = level.GetGridCell(nb);
                     if (nbCell.StepDistance < 0 && Simulator.IsPassable(level, nb))
                     {
                         int cellCost = 1;
@@ -372,7 +415,7 @@ namespace Waldolaw
             }
         }
 
-        private bool AllocateFuelAmongDocks(Simulator sim, Game game, Item ship)
+        private bool AllocateFuelAmongDocks(Simulator sim, Game<Cell> game, Item ship)
         {
             int accountedFuel = 0;
 
@@ -456,9 +499,9 @@ namespace Waldolaw
             }
         }
 
-        private Game _game;
+        private Game<Cell> _game;
         private Timer _timer;
         private bool _didDock = false;
-        private readonly Logger _logger = LogManager.GetCurrentClassLogger();
+        private readonly NLog.Logger _logger = LogManager.GetCurrentClassLogger();
     }
 }

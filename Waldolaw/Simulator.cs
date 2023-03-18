@@ -22,7 +22,7 @@ namespace Waldolaw
             public abstract List<Commands.Command> ToCommands();
         }
 
-        public Simulator(Game game)
+        public Simulator(Game<Cell> game)
         {
             _gameState = game;
         }
@@ -71,7 +71,7 @@ namespace Waldolaw
             return step * (1100 - (speed * 100));
         }
 
-        public static bool IsPassable(Level level, Pos pos)
+        public static bool IsPassable<CellT>(Level<CellT> level, Pos pos) where CellT : Cell, new()
         {
             return !level.GetGridCell(pos).Items
                 .Exists(it =>
@@ -119,20 +119,20 @@ namespace Waldolaw
         }
 
         private List<SimulatedCommandBase> _commands = new();
-        private Game _gameState;
+        private Game<Cell> _gameState;
 
 
 
         public class SimulatedCommandForward : SimulatedCommandBase
         {
-            public SimulatedCommandForward(Game game, Pos targetPos)
+            public SimulatedCommandForward(Game<Cell> game, Pos targetPos)
             {
                 Type = CommandType.Forward;
                 _game = game;
                 _targetPos = targetPos;
             }
 
-            private Game _game;
+            private Game<Cell> _game;
             private Pos _targetPos;
             private Pos _origPos;
             private int _steps = 0;
@@ -182,7 +182,7 @@ namespace Waldolaw
 
         public class SimulatedCommandTurn : SimulatedCommandBase
         {
-            public SimulatedCommandTurn(Game game, Direction targetDir)
+            public SimulatedCommandTurn(Game<Cell> game, Direction targetDir)
             {
                 Type = CommandType.Turn;
                 _game = game;
@@ -190,7 +190,7 @@ namespace Waldolaw
                 _originalDir = _game.Ship.Direction;
             }
 
-            private Game _game;
+            private Game<Cell> _game;
             private Direction _targetDir;
             private Direction _originalDir;
             private Direction _turnDir = Direction.None;
@@ -231,7 +231,7 @@ namespace Waldolaw
 
         public class SimulatedCommandDock : SimulatedCommandBase
         {
-            public SimulatedCommandDock(Game game, int dockDuration)
+            public SimulatedCommandDock(Game<Cell> game, int dockDuration)
             {
                 Type = CommandType.Dock;
                 _game = game;
@@ -245,7 +245,7 @@ namespace Waldolaw
             public int ShipFuelWhenArrived { get; private set; }
             public int DockDuration { get; private set; }
 
-            private Game _game;
+            private Game<Cell> _game;
             private int _timeCost = 0;
 
             public override void Do()

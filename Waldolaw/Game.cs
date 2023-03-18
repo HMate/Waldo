@@ -141,9 +141,9 @@ namespace Waldolaw
         }
     }
 
-    public class Game
+    public class Game<CellType> where CellType : Cell, new()
     {
-        public Level Level { get; private set; }
+        public Level<CellType> Level { get; private set; }
         public int MaxFuel { get; private set; }
         public int MaxSpeed { get; private set; }
         public List<Item> Items { get; private set; }
@@ -154,7 +154,7 @@ namespace Waldolaw
 
         public Game(int mapSize, int maxFuel, int maxSpeed, List<Item> items)
         {
-            Level = new Level(mapSize);
+            Level = new Level<CellType>(mapSize);
             Items = items;
             MaxFuel = maxFuel;
             MaxSpeed = maxSpeed;
@@ -182,10 +182,10 @@ namespace Waldolaw
 #endif
         }
 
-        internal Game Copy()
+        internal Game<CellT> Copy<CellT>() where CellT : Cell, new()
         {
             List<Item> items = Items.Select(i => i with { }).ToList();
-            Game copy = new Game(Level.Size, MaxFuel, MaxSpeed, items);
+            Game<CellT> copy = new Game<CellT>(Level.Size, MaxFuel, MaxSpeed, items);
             return copy;
         }
     }

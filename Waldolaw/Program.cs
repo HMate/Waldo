@@ -43,7 +43,7 @@ namespace Waldolaw
                     return;
                 }
                 GameBuilder builder = new();
-                Game game = builder.Build(input);
+                Game<Cell> game = builder.Build(input);
                 foreach (var item in game.Items)
                 {
                     logger.Info($"{item}");

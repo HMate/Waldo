@@ -11,14 +11,51 @@ using System.Threading.Tasks;
 
 namespace Waldolaw
 {
-    public class Level
+
+    public class Cell
+    {
+        public List<Item> Items = new();
+
+        public virtual void Clear()
+        {
+
+        }
+    }
+
+    public class DetailedCell : Cell
+    {
+        public int StepDistance = -1;
+        public Direction FirstStepDirection = Direction.None;
+        public Direction LastStepDirection = Direction.None;
+        public Dictionary<Direction, List<Direction>> Steps = new() {
+            {Direction.Top, new () } ,
+            {Direction.Right, new () } ,
+            {Direction.Bottom, new () } ,
+            {Direction.Left, new () } ,
+        };
+
+        public override void Clear()
+        {
+            StepDistance = -1;
+            Steps = new() {
+                        {Direction.Top, new () } ,
+                        {Direction.Right, new () } ,
+                        {Direction.Bottom, new () } ,
+                        {Direction.Left, new () } ,
+                    };
+            LastStepDirection = Direction.None;
+            FirstStepDirection = Direction.None;
+        }
+    }
+
+    public class Level<CellType> where CellType : Cell, new()
     {
         public int Size { get; private set; }
 
         public Level(int size)
         {
             Size = size;
-            _grid = Enumerable.Range(1, Size * Size).Select(x => new Cell()).ToArray();
+            _grid = Enumerable.Range(1, Size * Size).Select(x => new CellType()).ToArray();
         }
 
         public void PlaceItem(Pos position, Item item)
@@ -44,7 +81,7 @@ namespace Waldolaw
             return _grid[GetIndex(pos)].Items.FirstOrDefault();
         }
 
-        public Cell GetGridCell(Pos pos)
+        public CellType GetGridCell(Pos pos)
         {
             return _grid[GetIndex(pos)];
         }
@@ -130,75 +167,51 @@ namespace Waldolaw
 #endif
         }
 
-        public void PrintStepDistances()
-        {
-#if DEBUG
-            _logger.Debug("---- LEVEL DISTANCES: ----");
-            StringBuilder message = new StringBuilder();
-            for (int i = 0; i < _grid.Length; i++)
-            {
-                var cell = _grid[i];
-                message.Append($"{cell.StepDistance,3}|");
-                if (i != 0 && i % (Size - 1) == 0)
-                {
-                    _logger.Debug(message.ToString());
-                    message.Clear();
-                }
-            }
-#endif
-        }
+        //        public void PrintStepDistances()
+        //        {
+        //#if DEBUG
+        //            _logger.Debug("---- LEVEL DISTANCES: ----");
+        //            StringBuilder message = new StringBuilder();
+        //            for (int i = 0; i < _grid.Length; i++)
+        //            {
+        //                var cell = _grid[i];
+        //                message.Append($"{cell.StepDistance,3}|");
+        //                if (i != 0 && i % (Size - 1) == 0)
+        //                {
+        //                    _logger.Debug(message.ToString());
+        //                    message.Clear();
+        //                }
+        //            }
+        //#endif
+        //        }
 
-        public void PrintFirstStepDirections()
-        {
-#if DEBUG
-            _logger.Debug("---- LEVEL FIRST DIRECTIONS: ----");
-            StringBuilder message = new StringBuilder();
-            for (int i = 0; i < _grid.Length; i++)
-            {
-                var cell = _grid[i];
-                message.Append($"{cell.FirstStepDirection.ToAscii(),3}|");
-                if (i != 0 && i % (Size - 1) == 0)
-                {
-                    _logger.Debug(message.ToString());
-                    message.Clear();
-                }
-            }
-#endif
-        }
+        //        public void PrintFirstStepDirections()
+        //        {
+        //#if DEBUG
+        //            _logger.Debug("---- LEVEL FIRST DIRECTIONS: ----");
+        //            StringBuilder message = new StringBuilder();
+        //            for (int i = 0; i < _grid.Length; i++)
+        //            {
+        //                var cell = _grid[i];
+        //                message.Append($"{cell.FirstStepDirection.ToAscii(),3}|");
+        //                if (i != 0 && i % (Size - 1) == 0)
+        //                {
+        //                    _logger.Debug(message.ToString());
+        //                    message.Clear();
+        //                }
+        //            }
+        //#endif
+        //        }
 
         public void ClearGridDistances()
         {
             for (int i = 0; i < _grid.Length; i++)
             {
-                var cell = _grid[i];
-                cell.StepDistance = -1;
-                cell.Steps = new() {
-                        {Direction.Top, new () } ,
-                        {Direction.Right, new () } ,
-                        {Direction.Bottom, new () } ,
-                        {Direction.Left, new () } ,
-                    };
-                cell.LastStepDirection = Direction.None;
-                cell.FirstStepDirection = Direction.None;
-
+                _grid[i].Clear();
             }
         }
 
-        private readonly Cell[] _grid;
+        private readonly CellType[] _grid;
         private readonly Logger _logger = LogManager.GetCurrentClassLogger();
-    }
-
-    public class Cell
-    {
-        public List<Item> Items = new();
-        public int StepDistance = -1;
-        public Direction FirstStepDirection = Direction.None;
-        public Direction LastStepDirection = Direction.None;
-        public Dictionary<Direction, List<Direction>> Steps = new() {
-            {Direction.Top, new () } ,
-            {Direction.Right, new () } ,
-            {Direction.Bottom, new () } ,
-            {Direction.Left, new () } ,
-        };
     }
 }
