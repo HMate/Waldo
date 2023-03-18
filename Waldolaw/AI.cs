@@ -1,6 +1,5 @@
 ﻿using C5;
 using NLog;
-using System.Diagnostics;
 
 namespace Waldolaw
 {
@@ -111,9 +110,6 @@ namespace Waldolaw
             int waldoToBaseHeuristic = waldoDistances.DistancesTable[game.Waldo.Position][game.Base.Position].steps;
 
             List<Path> completePaths = new();
-            //SortedList<int, Path> pathQueue = new(new DuplicateKeyComparer<int>()) {
-            //    { 0, new Path(game.Base, 0, game.Ship.Fuel, game.MaxFuel, game.Ship.Speed, game.MaxSpeed, Direction.Top, new()) }
-            //};
             IPriorityQueue<Prio<Path>> pathQueue = new IntervalHeap<Prio<Path>>() {
                 new Prio<Path>(0,new Path(game.Base, 0, game.Ship.Fuel, game.MaxFuel, game.Ship.Speed, game.MaxSpeed, Direction.Top, new()))
             };
@@ -130,8 +126,6 @@ namespace Waldolaw
             while (pathQueue.Count > 0 &&
                 ((completePaths.Count > 0 && _timer.TimeMs() < timeout) || (completePaths.Count == 0)))
             {
-                //Path prevPath = pathQueue.GetValueAtIndex(0);
-                //pathQueue.RemoveAt(0);
                 Path prevPath = pathQueue.FindMin().Data;
                 pathQueue.DeleteMin();
 

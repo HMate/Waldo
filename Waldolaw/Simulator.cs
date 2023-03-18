@@ -1,13 +1,5 @@
 ﻿using CommunityToolkit.Diagnostics;
-using NLog.Targets;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel.Design.Serialization;
-using System.Linq;
-using System.Reflection.Emit;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
+
 
 namespace Waldolaw
 {
