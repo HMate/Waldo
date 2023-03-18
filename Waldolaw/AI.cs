@@ -1,4 +1,5 @@
 ﻿using NLog;
+using System.Diagnostics;
 
 namespace Waldolaw
 {
@@ -19,11 +20,16 @@ namespace Waldolaw
             List<Path> completePaths = CalculatePathToTargets(currentGame);
             _logger.Info($"Found {completePaths.Count} complete paths in {_timer.TimeMs()} ms");
 
+            Commands? bestCommands = EvaluatePaths(completePaths);
+            return bestCommands;
+        }
+
+        private Commands? EvaluatePaths(List<Path> completePaths)
+        {
             Commands? bestCommands = null;
             float bestScore = 10000000;
             int pathIndex = 0;
             int bestIndex = -1;
-
             foreach (var path in completePaths)
             {
                 pathIndex++;
@@ -33,8 +39,8 @@ namespace Waldolaw
                     break;
                 }
 #endif
-                _logger.Debug($"Simulating path #{pathIndex} {path}");
-                currentGame = _game.Copy();
+                // _logger.Debug($"Simulating path #{pathIndex} {path}");
+                Game currentGame = _game.Copy();
                 Simulator sim = new(currentGame);
                 Level level = currentGame.Level;
                 Item ship = currentGame.Ship;
@@ -59,15 +65,19 @@ namespace Waldolaw
                         bestCommands = commands;
                         bestScore = score;
                         bestIndex = pathIndex;
-                        _logger.Info($"Path #{pathIndex} has score {score}={commands.Count}+{timeCost}. New best score.");
+#if DEBUG
+                        _logger.Info($"Path #{pathIndex} has score {score}={commands.Count}+{timeCost}. New best score. {path}");
+#endif
                     }
                     else
                     {
-                        _logger.Info($"Path #{pathIndex} has score {score}={commands.Count}+{timeCost}.");
+#if DEBUG
+                        _logger.Info($"Path #{pathIndex} has score {score}={commands.Count}+{timeCost}. {path}");
+#endif
                     }
                 }
             }
-            _logger.Info($"Using path #{bestIndex} with score {bestScore}");
+            _logger.Info($"Using path #{bestIndex} with score {bestScore}. Checked {pathIndex}/{completePaths.Count} paths");
             return bestCommands;
         }
 
@@ -104,11 +114,15 @@ namespace Waldolaw
                 { 0, new Path(game.Base, 0, game.Ship.Fuel, game.MaxFuel, game.Ship.Speed, game.MaxSpeed, Direction.Top, new()) }
             };
 #if DEBUG
-            const long timeout = 4000;
+            long timeout = 4000;
 #else
             const long timeout = 3000;
 #endif
+#if DEBUG
+            long lastCallTimeout = 4700;
+#else
             const long lastCallTimeout = 3700;
+#endif
             while (pathQueue.Count > 0 &&
                 ((completePaths.Count > 0 && _timer.TimeMs() < timeout) || (completePaths.Count == 0)))
             {
@@ -118,14 +132,17 @@ namespace Waldolaw
                 var others = distances.OrderedSteps[prevPath.Last.Position];
                 foreach (TargetStepsStore.Entry target in others)
                 {
-                    if (target.Steps.Count == 0 || // Steps.Count==0 means we dont have path to that target from this pos.
-                       (!prevPath.HasWaldo && target.Pos == game.Base.Position))
+                    if (!prevPath.HasWaldo && target.Pos == game.Base.Position)
+                    {
+                        continue;
+                    }
+                    if (target.Steps.Count == 0) // Steps.Count==0 means we dont have path to that target from this pos.
                     {
                         continue;
                     }
                     var stepsToTarget = target.Steps;
                     Direction lastDir = prevPath.Facing;
-                    int addedSteps = 0; //prevPath.Facing.CostTo(stepsToTarget.First()) + stepsToTarget.Count;
+                    int addedSteps = 0;
                     for (int i = 0; i < stepsToTarget.Count; i++)
                     {
                         addedSteps += 1 + lastDir.CostTo(stepsToTarget[i]);
@@ -199,7 +216,6 @@ namespace Waldolaw
         class TargetDistancesStore
         {
             public record struct DistanceEntry(Pos pos, int steps, Direction startFacing, Direction endFacing);
-            public Dictionary<Pos, List<DistanceEntry>> OrderedDistances = new();
             public Dictionary<Pos, Dictionary<Pos, DistanceEntry>> DistancesTable = new();
         }
 
@@ -207,7 +223,6 @@ namespace Waldolaw
         {
             public record struct Entry(Pos Pos, List<Direction> Steps);
             public Dictionary<Pos, List<Entry>> OrderedSteps = new();
-            public Dictionary<Pos, Dictionary<Pos, Entry>> StepsTable = new();
         }
 
         /// <summary>
@@ -229,14 +244,15 @@ namespace Waldolaw
                 //level.PrintStepDistances();
 
                 result.OrderedSteps[target] = new();
-                result.StepsTable[target] = new();
                 foreach (Pos otherTarget in possibleTargets)
                 {
                     if (target == otherTarget) continue;
                     var cell = level.GetGridCell(otherTarget);
-                    var entry = new TargetStepsStore.Entry(otherTarget, cell.Steps);
-                    result.OrderedSteps[target].Add(entry);
-                    result.StepsTable[target].Add(otherTarget, entry);
+                    foreach (var direction in DirectionExtensions.MAIN_DIRECTIONS)
+                    {
+                        var entry = new TargetStepsStore.Entry(otherTarget, cell.Steps[direction]);
+                        result.OrderedSteps[target].Add(entry);
+                    }
                 }
                 result.OrderedSteps[target] = result.OrderedSteps[target].OrderBy(x => x.Steps.Count).ToList();
             }
@@ -262,7 +278,6 @@ namespace Waldolaw
                 //level.PrintStepDistances();
                 //level.PrintFirstStepDirections();
 
-                result.OrderedDistances[target] = new();
                 result.DistancesTable[target] = new();
                 foreach (Pos otherTarget in possibleTargets)
                 {
@@ -270,10 +285,8 @@ namespace Waldolaw
                     var cell = level.GetGridCell(otherTarget);
                     var entry = new TargetDistancesStore.DistanceEntry(
                             otherTarget, cell.StepDistance, cell.FirstStepDirection, cell.LastStepDirection);
-                    result.OrderedDistances[target].Add(entry);
                     result.DistancesTable[target].Add(otherTarget, entry);
                 }
-                result.OrderedDistances[target] = result.OrderedDistances[target].OrderBy(x => x.steps).ToList();
             }
             return result;
         }
@@ -303,25 +316,29 @@ namespace Waldolaw
         {
             level.GetGridCell(target).StepDistance = 0;
             Queue<(Pos next, Direction dir, int stepDist)> nextCells = new();
-            nextCells.Enqueue((target, Direction.None, 0));
 
-            while (nextCells.Any())
+            foreach (Direction direction in DirectionExtensions.MAIN_DIRECTIONS)
             {
-                (Pos pos, Direction dir, int currentDist) = nextCells.Dequeue();
-                List<(Pos, Direction)> nbs = level.GetNeighbours(pos);
-                Cell curCell = level.GetGridCell(pos);
-                foreach (var (nb, nbDir) in nbs)
+                nextCells.Enqueue((target, direction, 0));
+
+                while (nextCells.Any())
                 {
-                    Cell nbCell = level.GetGridCell(nb);
-                    int stepDist = 1 + currentDist + dir.CostTo(nbDir);
-                    if (Simulator.IsPassable(level, nb) &&
-                        (nbCell.StepDistance < 0 || stepDist < nbCell.StepDistance))
+                    (Pos pos, Direction dir, int currentDist) = nextCells.Dequeue();
+                    List<(Pos, Direction)> nbs = level.GetNeighbours(pos);
+                    Cell curCell = level.GetGridCell(pos);
+                    foreach (var (nb, nbDir) in nbs)
                     {
-                        nbCell.StepDistance = stepDist;
-                        nbCell.Steps = curCell.Steps.Append(nbDir).ToList();
-                        if (nbCell.Items.Count == 0 || !IsTarget(nbCell.Items[0]))
+                        Cell nbCell = level.GetGridCell(nb);
+                        int stepDist = 1 + currentDist + dir.CostTo(nbDir);
+                        if (Simulator.IsPassable(level, nb) &&
+                            (nbCell.StepDistance < 0 || stepDist < nbCell.StepDistance))
                         {
-                            nextCells.Enqueue((nb, nbDir, stepDist));
+                            nbCell.StepDistance = stepDist;
+                            nbCell.Steps[direction] = curCell.Steps[direction].Append(nbDir).ToList();
+                            if (nbCell.Items.Count == 0 || !IsTarget(nbCell.Items[0]))
+                            {
+                                nextCells.Enqueue((nb, nbDir, stepDist));
+                            }
                         }
                     }
                 }

@@ -20,6 +20,8 @@ namespace Waldolaw
 
     public static class DirectionExtensions
     {
+        public static readonly Direction[] MAIN_DIRECTIONS = new[] { Direction.Top, Direction.Right, Direction.Bottom, Direction.Left };
+
         public static int CostTo(this Direction current, Direction target)
         {
             if (current == target) return 0;
@@ -173,10 +175,11 @@ namespace Waldolaw
                 }
                 Level.PlaceItem(item.Position, item);
             }
-
+#if DEBUG
             Guard.IsNotNull(Waldo, $"items should contain a {nameof(Waldo)} entry");
             Guard.IsNotNull(Base, $"items should contain a {nameof(Base)} entry");
             Guard.IsNotNull(Ship, $"items should contain a {nameof(Ship)} entry");
+#endif
         }
 
         internal Game Copy()

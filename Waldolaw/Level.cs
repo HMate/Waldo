@@ -4,6 +4,7 @@ using NLog;
 using NLog.Targets;
 using System;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -17,12 +18,7 @@ namespace Waldolaw
         public Level(int size)
         {
             Size = size;
-            _grid = Enumerable.Range(1, Size).Select(y => Enumerable.Range(1, Size).Select(x => new Cell()).ToArray()).ToArray();
-        }
-
-        public Item? ItemAt(Pos pos)
-        {
-            return _grid[pos.Y][pos.X].Items.FirstOrDefault();
+            _grid = Enumerable.Range(1, Size * Size).Select(x => new Cell()).ToArray();
         }
 
         public void PlaceItem(Pos position, Item item)
@@ -43,9 +39,14 @@ namespace Waldolaw
             item.Position = newPos;
         }
 
+        public Item? ItemAt(Pos pos)
+        {
+            return _grid[GetIndex(pos)].Items.FirstOrDefault();
+        }
+
         public Cell GetGridCell(Pos pos)
         {
-            return _grid[pos.Y][pos.X];
+            return _grid[GetIndex(pos)];
         }
 
         public List<(Pos, Direction)> GetNeighbours(Pos current)
@@ -71,53 +72,60 @@ namespace Waldolaw
             return result;
         }
 
+        private int GetIndex(Pos pos)
+        {
+            return Size * pos.Y + pos.X;
+        }
+
         public void PrintLevel(Item ship)
         {
 #if DEBUG
             _logger.Debug($"---- LEVEL: -- SHIP FUEL: {ship.Fuel} --");
-            foreach (var row in _grid)
+            StringBuilder message = new StringBuilder();
+            for (int i = 0; i < _grid.Length; i++)
             {
-                StringBuilder message = new StringBuilder();
-                foreach (var cell in row)
+                var cell = _grid[i];
+                if (cell.Items.Count == 0)
                 {
-                    if (cell.Items.Count == 0)
+                    message.Append(".");
+                }
+                else
+                {
+                    Item? cellShip = cell.Items.Find(it => it.Type == ItemType.Ship);
+                    if (cellShip != null)
                     {
-                        message.Append(".");
+                        message.Append(ship.Direction.ToAscii());
                     }
-                    else
+                    else if (cell.Items[0].Type == ItemType.Waldo)
                     {
-                        Item? cellShip = cell.Items.Find(it => it.Type == ItemType.Ship);
-                        if (cellShip != null)
-                        {
-                            message.Append(ship.Direction.ToAscii());
-                        }
-                        else if (cell.Items[0].Type == ItemType.Waldo)
-                        {
-                            message.Append("W");
-                        }
-                        else if (cell.Items[0].Type == ItemType.Satellite)
-                        {
-                            message.Append("S");
-                        }
-                        else if (cell.Items[0].Type == ItemType.Planet)
-                        {
-                            message.Append("P");
-                        }
-                        else if (cell.Items[0].Type == ItemType.Asteroid)
-                        {
-                            message.Append("A");
-                        }
-                        else if (cell.Items[0].Type == ItemType.Turbo)
-                        {
-                            message.Append("T");
-                        }
-                        else if (cell.Items[0].Type == ItemType.Base)
-                        {
-                            message.Append("B");
-                        }
+                        message.Append("W");
+                    }
+                    else if (cell.Items[0].Type == ItemType.Satellite)
+                    {
+                        message.Append("S");
+                    }
+                    else if (cell.Items[0].Type == ItemType.Planet)
+                    {
+                        message.Append("P");
+                    }
+                    else if (cell.Items[0].Type == ItemType.Asteroid)
+                    {
+                        message.Append("A");
+                    }
+                    else if (cell.Items[0].Type == ItemType.Turbo)
+                    {
+                        message.Append("T");
+                    }
+                    else if (cell.Items[0].Type == ItemType.Base)
+                    {
+                        message.Append("B");
                     }
                 }
-                _logger.Debug(message.ToString());
+                if (i != 0 && i % (Size - 1) == 0)
+                {
+                    _logger.Debug(message.ToString());
+                    message.Clear();
+                }
             }
 #endif
         }
@@ -126,14 +134,16 @@ namespace Waldolaw
         {
 #if DEBUG
             _logger.Debug("---- LEVEL DISTANCES: ----");
-            foreach (var row in _grid)
+            StringBuilder message = new StringBuilder();
+            for (int i = 0; i < _grid.Length; i++)
             {
-                StringBuilder message = new StringBuilder();
-                foreach (var cell in row)
+                var cell = _grid[i];
+                message.Append($"{cell.StepDistance,3}|");
+                if (i != 0 && i % (Size - 1) == 0)
                 {
-                    message.Append($"{cell.StepDistance,3}|");
+                    _logger.Debug(message.ToString());
+                    message.Clear();
                 }
-                _logger.Debug(message.ToString());
             }
 #endif
         }
@@ -142,33 +152,39 @@ namespace Waldolaw
         {
 #if DEBUG
             _logger.Debug("---- LEVEL FIRST DIRECTIONS: ----");
-            foreach (var row in _grid)
+            StringBuilder message = new StringBuilder();
+            for (int i = 0; i < _grid.Length; i++)
             {
-                StringBuilder message = new StringBuilder();
-                foreach (var cell in row)
+                var cell = _grid[i];
+                message.Append($"{cell.FirstStepDirection.ToAscii(),3}|");
+                if (i != 0 && i % (Size - 1) == 0)
                 {
-                    message.Append($"{cell.FirstStepDirection.ToAscii(),3}|");
+                    _logger.Debug(message.ToString());
+                    message.Clear();
                 }
-                _logger.Debug(message.ToString());
             }
 #endif
         }
 
         public void ClearGridDistances()
         {
-            foreach (var row in _grid)
+            for (int i = 0; i < _grid.Length; i++)
             {
-                foreach (var cell in row)
-                {
-                    cell.StepDistance = -1;
-                    cell.Steps = new();
-                    cell.LastStepDirection = Direction.None;
-                    cell.FirstStepDirection = Direction.None;
-                }
+                var cell = _grid[i];
+                cell.StepDistance = -1;
+                cell.Steps = new() {
+                        {Direction.Top, new () } ,
+                        {Direction.Right, new () } ,
+                        {Direction.Bottom, new () } ,
+                        {Direction.Left, new () } ,
+                    };
+                cell.LastStepDirection = Direction.None;
+                cell.FirstStepDirection = Direction.None;
+
             }
         }
 
-        private readonly Cell[][] _grid;
+        private readonly Cell[] _grid;
         private readonly Logger _logger = LogManager.GetCurrentClassLogger();
     }
 
@@ -178,6 +194,11 @@ namespace Waldolaw
         public int StepDistance = -1;
         public Direction FirstStepDirection = Direction.None;
         public Direction LastStepDirection = Direction.None;
-        public List<Direction> Steps = new();
+        public Dictionary<Direction, List<Direction>> Steps = new() {
+            {Direction.Top, new () } ,
+            {Direction.Right, new () } ,
+            {Direction.Bottom, new () } ,
+            {Direction.Left, new () } ,
+        };
     }
 }
