@@ -1,8 +1,10 @@
 ﻿//#define PATHPRINT
+//#define PARALLELIZE
 using C5;
 using NLog;
 using System.IO;
 using System.Linq;
+using System.Threading;
 
 namespace Waldolaw
 {
@@ -40,7 +42,68 @@ namespace Waldolaw
             return bestCommands;
         }
 
+        private class EvalResult
+        {
+            public int count;
+            public Commands? bestCommands;
+            public float bestScore;
+        }
+
         private Commands? EvaluatePaths(List<Path> completePaths, long timeout)
+        {
+            Commands? bestCommands = null;
+            float bestScore = 10000000;
+            int pathIndex = 0;
+#if PARALLELIZE
+            int workerThreads = Environment.ProcessorCount;
+            if (workerThreads == 1 ||
+                (completePaths.Count * 2 < workerThreads) ||
+                _timer.TimeMs() > (timeout - 50))
+            {
+                _logger.Info($"Running on single thread for {completePaths.Count} paths and {workerThreads} threads");
+                EvalResult res = EvalPathsPart(completePaths, timeout);
+                pathIndex = res.count;
+                bestCommands = res.bestCommands;
+                bestScore = res.bestScore;
+            }
+            else
+            {
+                _logger.Info($"Running on {workerThreads} threads");
+                Task<EvalResult>[] taskArray = new Task<EvalResult>[workerThreads];
+                int total = completePaths.Count;
+                int fullBatchSize = (total / workerThreads) + 1;
+                int remainingBatchSize = total - (fullBatchSize * (workerThreads - 1));
+
+                for (int i = 0; i < taskArray.Length; i++)
+                {
+                    var batch = completePaths.Skip(i * fullBatchSize).Take(fullBatchSize).ToList();
+                    taskArray[i] = Task<EvalResult>.Factory.StartNew(() => EvalPathsPart(batch, timeout));
+                }
+                Task.WaitAll(taskArray);
+                for (int i = 0; i < taskArray.Length; i++)
+                {
+                    EvalResult res = taskArray[i].Result;
+                    _logger.Info($"Task {i} had {res.count} result with best score {res.bestScore}");
+                    pathIndex += res.count;
+                    if (res.bestScore > -1 && res.bestScore < bestScore)
+                    {
+                        bestScore = res.bestScore;
+                        bestCommands = res.bestCommands;
+                    }
+                }
+            }
+#else
+            EvalResult res = EvalPathsPart(completePaths, timeout);
+            pathIndex = res.count;
+            bestCommands = res.bestCommands;
+            bestScore = res.bestScore;
+#endif
+
+            _logger.Info($"Using path with score {bestScore}. Checked {pathIndex}/{completePaths.Count} paths");
+            return bestCommands;
+        }
+
+        private EvalResult EvalPathsPart(List<Path> completePaths, long timeout)
         {
             Commands? bestCommands = null;
             float bestScore = 10000000;
@@ -55,7 +118,7 @@ namespace Waldolaw
                     break;
                 }
 #endif
-                // _logger.Debug($"Simulating path #{pathIndex} {path}");
+                //_logger.Debug($"Simulating path #{pathIndex} {path}");
                 Game<Cell> currentGame = _game.Copy<Cell>();
                 Simulator sim = new(currentGame);
                 Level<Cell> level = currentGame.Level;
@@ -90,8 +153,7 @@ namespace Waldolaw
                     }
                 }
             }
-            _logger.Info($"Using path #{bestIndex} with score {bestScore}. Checked {pathIndex}/{completePaths.Count} paths");
-            return bestCommands;
+            return new EvalResult() { count = pathIndex, bestCommands = bestCommands, bestScore = bestScore };
         }
 
         private static bool IsTarget(Item it)
@@ -179,7 +241,7 @@ namespace Waldolaw
                                 : waldoDistances.DistancesTable[path.Last.Position][game.Waldo.Position].steps + waldoToBaseHeuristic;
                         }
 
-                        double heuristic = path.StepsValue + Simulator.CalcValue((remainingHeuristic * 1.1), remainingHeuristic, path.Speed);
+                        double heuristic = path.StepsValue + Simulator.CalcValue((remainingHeuristic * 1.4), remainingHeuristic, path.Speed);
                         if (path.IsComplete())
                         {
 #if PATHPRINT

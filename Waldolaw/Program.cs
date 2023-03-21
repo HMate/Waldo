@@ -15,7 +15,7 @@ namespace Waldolaw
             var inputsPath = args[0];
             var outputPath = args[1];
 
-            string layout = "${longdate}|${level:uppercase=true}|${logger}| ${message:withException=true}";
+            string layout = "${longdate} [${threadid}]|${level:uppercase=true}|${logger}| ${message:withException=true}";
             Logger logger = NLog.LogManager.Setup().LoadConfiguration(builder =>
             {
                 builder.ForLogger().WriteToConsole(layout, writeBuffered: true);
