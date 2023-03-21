@@ -18,9 +18,9 @@ namespace Waldolaw
             string layout = "${longdate}|${level:uppercase=true}|${logger}| ${message:withException=true}";
             Logger logger = NLog.LogManager.Setup().LoadConfiguration(builder =>
             {
-                builder.ForLogger().WriteToConsole(layout);
+                builder.ForLogger().WriteToConsole(layout, writeBuffered: true);
                 builder.ForLogger().WriteToDebugConditional(layout);
-                builder.ForLogger().WriteToFile(fileName: "waldolaw.log", layout, archiveAboveSize: 2000000, maxArchiveFiles: 5);
+                builder.ForLogger().WriteToFile(fileName: "waldolaw.log", layout, archiveAboveSize: 10000000, maxArchiveFiles: 5);
             }).GetCurrentClassLogger();
 
             try

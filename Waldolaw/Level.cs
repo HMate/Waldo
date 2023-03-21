@@ -15,11 +15,23 @@ namespace Waldolaw
         }
     }
 
-    public class DetailedCell : Cell
+    public class PathCalcCell : Cell
     {
         public int StepDistance = -1;
         public Direction FirstStepDirection = Direction.None;
         public Direction LastStepDirection = Direction.None;
+
+        public override void Clear()
+        {
+            base.Clear();
+            StepDistance = -1;
+            LastStepDirection = Direction.None;
+            FirstStepDirection = Direction.None;
+        }
+    }
+
+    public class DetailedCell : PathCalcCell
+    {
         public Dictionary<Direction, int> ValueForDir = new() {
             {Direction.Top, -1 } ,
             {Direction.Right, -1 } ,
@@ -35,7 +47,7 @@ namespace Waldolaw
 
         public override void Clear()
         {
-            StepDistance = -1;
+            base.Clear();
             Steps = new() {
                         {Direction.Top, new () } ,
                         {Direction.Right, new () } ,
@@ -48,8 +60,19 @@ namespace Waldolaw
                 {Direction.Bottom, -1 } ,
                 {Direction.Left, -1 } ,
             };
-            LastStepDirection = Direction.None;
-            FirstStepDirection = Direction.None;
+        }
+    }
+
+    public class UnorientedCell : PathCalcCell
+    {
+        public int Value = -1;
+        public List<Direction> Steps = new();
+
+        public override void Clear()
+        {
+            base.Clear();
+            Steps = new();
+            Value = -1;
         }
     }
 

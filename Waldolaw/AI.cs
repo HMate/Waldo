@@ -1,4 +1,5 @@
-﻿using C5;
+﻿//#define PATHPRINT
+using C5;
 using NLog;
 using System.IO;
 using System.Linq;
@@ -18,15 +19,28 @@ namespace Waldolaw
             _logger.Debug($"Waldo is at {_game.Waldo.Position}");
             _logger.Debug($"Level size: {_game.Level.Size}");
 
+
+#if DEBUG
+            long timeout = 4000;
+#else
+            const long timeout = 3600;
+#endif
+#if DEBUG
+            long lastCallTimeout = 4700;
+#else
+            const long lastCallTimeout = 3700;
+#endif
+            long appTimeout = 3800;
+
+            List<Path> completePaths;
             Game<DetailedCell> currentGame = _game.Copy<DetailedCell>();
+            completePaths = CalculatePathToTargets(currentGame, timeout, lastCallTimeout);
 
-            List<Path> completePaths = CalculatePathToTargets(currentGame);
-
-            Commands? bestCommands = EvaluatePaths(completePaths);
+            Commands? bestCommands = EvaluatePaths(completePaths, appTimeout);
             return bestCommands;
         }
 
-        private Commands? EvaluatePaths(List<Path> completePaths)
+        private Commands? EvaluatePaths(List<Path> completePaths, long timeout)
         {
             Commands? bestCommands = null;
             float bestScore = 10000000;
@@ -36,7 +50,7 @@ namespace Waldolaw
             {
                 pathIndex++;
 #if !(DEBUG)
-                if (_timer.TimeMs() > 3850)
+                if (_timer.TimeMs() > timeout)
                 {
                     break;
                 }
@@ -62,7 +76,7 @@ namespace Waldolaw
                 {
                     (Commands commands, float timeCost) = sim.GenerateCommands();
                     float score = commands.Count + timeCost;
-#if DEBUG
+#if PATHPRINT
                     _logger.Info($"Path #{pathIndex} has score {score}={commands.Count}+{timeCost}. {path}");
 #endif
                     if (score < bestScore)
@@ -70,7 +84,7 @@ namespace Waldolaw
                         bestCommands = commands;
                         bestScore = score;
                         bestIndex = pathIndex;
-#if DEBUG
+#if PATHPRINT
                         _logger.Info($"Path #{pathIndex} has score {score}={commands.Count}+{timeCost}. New best score. {path}");
 #endif
                     }
@@ -88,7 +102,7 @@ namespace Waldolaw
                     it.Type == ItemType.Turbo;
         }
 
-        private List<Path> CalculatePathToTargets(Game<DetailedCell> game)
+        private List<Path> CalculatePathToTargets(Game<DetailedCell> game, long timeout, long lastCallTimeout)
         {
             /**
             - Run A* on targets.
@@ -114,21 +128,11 @@ namespace Waldolaw
             };
 
             int checkedPaths = 0;
-#if DEBUG
-            long timeout = 4000;
-#else
-            const long timeout = 3000;
-#endif
-#if DEBUG
-            long lastCallTimeout = 4700;
-#else
-            const long lastCallTimeout = 3700;
-#endif
             while (pathQueue.Count > 0 &&
                 ((completePaths.Count > 0 && _timer.TimeMs() < timeout) || (completePaths.Count == 0)))
             {
                 var current = pathQueue.FindMin();
-#if DEBUG
+#if PATHPRINT
                 _logger.Info($"Checking candidate H: {current.Priority}");
 #endif
                 Path prevPath = current.Data;
@@ -175,11 +179,11 @@ namespace Waldolaw
                                 : waldoDistances.DistancesTable[path.Last.Position][game.Waldo.Position].steps + waldoToBaseHeuristic;
                         }
 
-                        double heuristic = path.StepsValue + Simulator.CalcValue((remainingHeuristic * 0.2), remainingHeuristic, path.Speed);
+                        double heuristic = path.StepsValue + Simulator.CalcValue((remainingHeuristic * 1.1), remainingHeuristic, path.Speed);
                         if (path.IsComplete())
                         {
-#if DEBUG
-                            _logger.Info($"Complete path: {path}, H: {heuristic}");
+#if PATHPRINT
+                            _logger.Info($"Complete path: #{checkedPaths} {path}, H: {heuristic}");
 #endif
                             completePaths.Add(path);
                         }
@@ -187,8 +191,8 @@ namespace Waldolaw
                         {
                             checkedPaths++;
                             pathQueue.Add(new Prio<Path>(heuristic, path));
-#if DEBUG
-                            _logger.Info($"Valid path: {path}, H: {heuristic}");
+#if PATHPRINT
+                            _logger.Info($"Valid path: #{checkedPaths} {path}, H: {heuristic}");
 #endif
                         }
 #if !(DEBUG)
@@ -257,6 +261,12 @@ namespace Waldolaw
             public Dictionary<Pos, Dictionary<Pos, DistanceEntry>> DistancesTable = new();
         }
 
+        class TargetUnorientedStepsStore
+        {
+            public record struct Entry(Pos Pos, List<Direction> Steps, int Value);
+            public Dictionary<Pos, List<Entry>> OrderedSteps = new();
+        }
+
         class TargetStepsStore
         {
             public record struct Entry(Pos Pos, List<Direction> Steps, int Value);
@@ -264,7 +274,7 @@ namespace Waldolaw
         }
 
         /// <summary>
-        /// Calculate step counts from all possible targets to all other possible targets.
+        /// Calculate step counts from all possible targets to all other possible targets, and gives the detailed route between targets.
         /// First dict contains starting positions, inner list contains end positions and steps until that pos ordered by lowest steps first.
         /// </summary>
         private TargetStepsStore CalculateStrictTargetDistances(Game<DetailedCell> game, List<Pos> possibleTargets)
@@ -341,14 +351,90 @@ namespace Waldolaw
         }
 
         /// <summary>
+        /// Calculate step counts from all possible targets to all other possible targets, and gives the detailed route between targets.
+        /// The orientation of the ship from the targets are not taken into account for faster computation.
+        /// First dict contains starting positions, inner list contains end positions and steps until that pos ordered by lowest steps first.
+        /// </summary>
+        private TargetUnorientedStepsStore CalculateUnorientedTargetDistances(Game<UnorientedCell> game, List<Pos> possibleTargets)
+        {
+            TargetUnorientedStepsStore result = new();
+
+            Level<UnorientedCell> level = game.Level;
+            _logger.Debug($"calculating strict target distances for {possibleTargets.Count} targets");
+            level.PrintLevel(game.Waldo);
+            foreach (Pos target in possibleTargets)
+            {
+                level.ClearGridDistances();
+                CalcUnorientedStepDistancesFromTarget(level, target);
+                //level.PrintStepDistances();
+
+                result.OrderedSteps[target] = new();
+                foreach (Pos otherTarget in possibleTargets)
+                {
+                    if (target == otherTarget) continue;
+                    var cell = level.GetGridCell(otherTarget);
+                    int valueForPlanet = (cell.Items[0].Type == ItemType.Planet) ? 1 : 0;
+                    foreach (var direction in DirectionExtensions.MAIN_DIRECTIONS)
+                    {
+                        var entry = new TargetUnorientedStepsStore.Entry(otherTarget, cell.Steps, cell.Value + valueForPlanet);
+                        result.OrderedSteps[target].Add(entry);
+                    }
+                }
+                foreach (var direction in DirectionExtensions.MAIN_DIRECTIONS)
+                {
+                    result.OrderedSteps[target] =
+                        result.OrderedSteps[target].OrderBy(x => x.Steps.Count).ToList();
+                }
+            }
+            return result;
+        }
+
+        private void CalcUnorientedStepDistancesFromTarget(Level<UnorientedCell> level, Pos target)
+        {
+            Queue<(Pos next, Direction dir, int stepDist)> nextCells = new();
+
+            level.GetGridCell(target).Value = 0;
+            nextCells.Enqueue((target, Direction.None, 1));
+
+            while (nextCells.Any())
+            {
+                (Pos pos, Direction dir, int currentVal) = nextCells.Dequeue();
+                List<(Pos, Direction)> nbs = level.GetNeighbours(pos);
+                UnorientedCell curCell = level.GetGridCell(pos);
+                foreach (var (nb, nbDir) in nbs)
+                {
+                    UnorientedCell nbCell = level.GetGridCell(nb);
+                    int stepVal = dir.CostTo(nbDir) + 1;
+                    if (stepVal == 1)
+                    {
+                        stepVal = 0;
+                    }
+                    int pathVal = stepVal + currentVal;
+                    if (Simulator.IsPassable(level, nb) &&
+                        (nbCell.Value < 0 || pathVal < nbCell.Value))
+                    {
+                        nbCell.Value = pathVal;
+                        nbCell.Steps = curCell.Steps.Append(nbDir).ToList();
+                        if (nbCell.Items.Count == 0 || !IsTarget(nbCell.Items[0]))
+                        {
+                            nextCells.Enqueue((nb, nbDir, pathVal));
+                        }
+                    }
+                }
+            }
+
+        }
+
+        /// <summary>
         /// Calculate step counts from all possible targets to all other possible targets.
         /// First dict contains starting positions, inner list contains end positions and steps until that pos ordered by lowest steps first.
         /// </summary>
-        private TargetDistancesStore CalculateTargetDistances(Game<DetailedCell> game, List<Pos> possibleTargets)
+        private TargetDistancesStore CalculateTargetDistances<CellType>(Game<CellType> game, List<Pos> possibleTargets)
+            where CellType : PathCalcCell, new()
         {
             TargetDistancesStore result = new();
 
-            Level<DetailedCell> level = game.Level;
+            Level<CellType> level = game.Level;
             _logger.Debug($"calculating target distances for {possibleTargets.Count} targets");
             level.PrintLevel(game.Waldo);
             foreach (Pos target in possibleTargets)
@@ -371,7 +457,8 @@ namespace Waldolaw
             return result;
         }
 
-        private void CalcStepDistancesToTarget(Level<DetailedCell> level, Pos target)
+        private void CalcStepDistancesToTarget<CellType>(Level<CellType> level, Pos target)
+            where CellType : PathCalcCell, new()
         {
             level.GetGridCell(target).StepDistance = 0;
             Queue<(Pos, Direction)> nextCells = new();
@@ -385,7 +472,7 @@ namespace Waldolaw
                 Direction firstDir = level.GetGridCell(pos).FirstStepDirection;
                 foreach (var (nb, nbDir) in nbs)
                 {
-                    DetailedCell nbCell = level.GetGridCell(nb);
+                    CellType nbCell = level.GetGridCell(nb);
                     if (nbCell.StepDistance < 0 && Simulator.IsPassable(level, nb))
                     {
                         int cellCost = 1;
